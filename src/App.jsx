@@ -170,15 +170,17 @@ export default function App() {
       const { data, error } = await supabase
         .from("modules")
         .select("*")
-        .eq("active", true)
         .order("id", { ascending: true });
 
+      alert("Módulos recebidos: " + JSON.stringify(data));
+      alert("Erro: " + JSON.stringify(error));
+
       if (error) {
-        console.log("Erro modules:", error);
+        alert("Erro ao buscar módulos: " + error.message);
         return;
       }
 
-      setModules(data);
+      setModules(data || []);
     }
 
     fetchModules();
