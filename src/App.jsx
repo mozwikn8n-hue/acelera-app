@@ -36,42 +36,7 @@ function getInitials(name) {
     .slice(0, 2)
     .toUpperCase();
 }
-
-const modules = [
-  {
-    id: 1,
-    title: "Mentalidade de Fundador",
-    unlocked: true,
-    icon: "🧠",
-    teaser:
-      "Como os maiores empreendedores de África pensam diferente — e como você pode também.",
-    duration: "45 min",
-  },
-  {
-    id: 2,
-    title: "Posicionamento de Mercado",
-    unlocked: true,
-    icon: "🎯",
-    teaser: "Descobre o teu nicho irresistível e pára de competir por preço.",
-    duration: "60 min",
-  },
-  {
-    id: 3,
-    title: "Vendas Sem Pressão",
-    unlocked: false,
-    icon: "💎",
-    teaser: "Desbloqueado em 5 dias...",
-    duration: "55 min",
-  },
-  {
-    id: 4,
-    title: "Escalar com Sistemas",
-    unlocked: false,
-    icon: "⚙️",
-    teaser: "Desbloqueado no evento.",
-    duration: "75 min",
-  },
-];
+const [modules, setModules] = useState([]);
 
 const community = [
   {
@@ -188,7 +153,9 @@ export default function App() {
   const [newMsg, setNewMsg] = useState("");
   const [posts, setPosts] = useState(community);
   const [expandedModule, setExpandedModule] = useState(null);
+
   const [speakers, setSpeakers] = useState([]);
+  const [modules, setModules] = useState([]);
 
   const userAvatar = mockUser.avatar || getInitials(mockUser.name);
   const countdown = useCountdown(mockUser.eventDate);
@@ -201,18 +168,22 @@ export default function App() {
   const displayedSpeakers = speakers.length > 0 ? speakers : fallbackSpeakers;
 
   useEffect(() => {
-    async function fetchSpeakers() {
-      const { data, error } = await supabase.from("speakers").select("*");
+    async function fetchModules() {
+      const { data, error } = await supabase
+        .from("modules")
+        .select("*")
+        .eq("active", true)
+        .order("id", { ascending: true });
 
       if (error) {
-        console.log("Erro ao buscar speakers:", error);
+        console.log("Erro modules:", error);
         return;
       }
 
-      setSpeakers(data || []);
+      setModules(data);
     }
 
-    fetchSpeakers();
+    fetchModules();
   }, []);
 
   const toggleLike = (id) => {
