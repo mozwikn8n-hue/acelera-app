@@ -14,89 +14,85 @@ const COLORS = {
   muted: "#8888AA",
   accent: "#6C63FF",
   accentGlow: "rgba(108,99,255,0.2)",
-  success: "#4CAF8C",
 };
 
 const mockUser = {
-  name: "Dadiva Gulele",
-  course: "Acelera - Carreira Com Propósito",
+  name: "Dádiva Gulele",
+  course: "Acelera – Carreira Com Propósito",
   edition: "4.0",
-  daysLeft: 12,
-  avatar: "BN",
-  progress: 65,
+  eventMonthLabel: "Julho de 2026",
+  eventDate: "2026-07-01T00:00:00+02:00",
+  avatar: "",
 };
+
+function getInitials(name) {
+  return name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
 
 const modules = [
   {
     id: 1,
-    title: "Mentalidade de Fundador",
+    title: "Autoconhecimento & Dicas Práticas de Aceleração de Carreira",
     unlocked: true,
-    icon: "🧠",
+    completed: false,
+    icon: "🧭",
     teaser:
-      "Como os maiores empreendedores de África pensam diferente — e como você pode também.",
-    duration: "45 min",
-  },
-  {
-    id: 2,
-    title: "Posicionamento de Mercado",
-    unlocked: true,
-    icon: "🎯",
-    teaser: "Descobre o teu nicho irresistível e pára de competir por preço.",
+      "Uma sessão para reconhecer pontos fortes, desafios e caminhos de crescimento.",
     duration: "60 min",
   },
   {
-    id: 3,
-    title: "Vendas Sem Pressão",
-    unlocked: false,
-    icon: "💎",
-    teaser: "Desbloqueado em 5 dias...",
-    duration: "55 min",
+    id: 2,
+    title: "Assessment de Carreira & Plano de Médio Prazo",
+    unlocked: true,
+    completed: false,
+    icon: "📌",
+    teaser:
+      "Organiza decisões, prioridades e metas profissionais com mais clareza.",
+    duration: "75 min",
   },
   {
-    id: 4,
-    title: "Escalar com Sistemas",
+    id: 3,
+    title: "Liderança – Efeito Multiplicador",
     unlocked: false,
-    icon: "⚙️",
-    teaser: "Desbloqueado no evento.",
-    duration: "75 min",
+    completed: false,
+    icon: "✨",
+    teaser: "Desbloqueado durante a jornada.",
+    duration: "60 min",
   },
 ];
 
 const community = [
   {
     id: 1,
-    user: "Carlos M.",
-    avatar: "CM",
-    time: "há 2h",
-    msg: "Já apliquei a técnica do módulo 1 no meu negócio. Resultados em 3 dias! 🔥",
-    likes: 14,
+    user: "Glayds G.",
+    avatar: "GG",
+    time: "agora",
+    msg: "Bem-vindas ao Acelera 4.0. Esta jornada será sobre propósito, estratégia e crescimento consciente.",
+    likes: 0,
     color: "#C9A84C",
-  },
-  {
-    id: 2,
-    user: "Flávia T.",
-    avatar: "FT",
-    time: "há 4h",
-    msg: "Alguém mais de Maputo que precisa de carona para o evento? Vamos organizar 😊",
-    likes: 7,
-    color: "#6C63FF",
   },
 ];
 
 const agenda = [
   { time: "08:30", title: "Chegada & Networking", type: "network" },
-  { time: "09:00", title: "Abertura — A Visão do Evento", type: "keynote" },
-  { time: "10:00", title: "Painel: Mentalidade de Escala", type: "panel" },
-  { time: "11:30", title: "Pausa Café & Conexões", type: "break" },
+  { time: "09:00", title: "Abertura da Jornada Acelera 4.0", type: "keynote" },
   {
-    time: "12:00",
-    title: "Workshop: Posicionamento ao Vivo",
+    time: "10:00",
+    title: "Sessão 1: Autoconhecimento & Carreira",
     type: "workshop",
   },
-  { time: "14:00", title: "Almoço Executivo", type: "break" },
-  { time: "15:30", title: "Cases Reais de Moçambique", type: "case" },
-  { time: "17:00", title: "Sessão Q&A + Desafio 30 Dias", type: "qa" },
-  { time: "18:00", title: "Networking Final & Encerramento", type: "close" },
+  { time: "12:00", title: "Intervalo & Conexões", type: "break" },
+  { time: "14:00", title: "Sessão 2: Plano de Carreira", type: "workshop" },
+  {
+    time: "16:00",
+    title: "Sessão 3: Liderança e Efeito Multiplicador",
+    type: "panel",
+  },
 ];
 
 const typeColors = {
@@ -105,23 +101,33 @@ const typeColors = {
   workshop: "#4CAF8C",
   network: "#E8637A",
   break: "#8888AA",
-  case: "#FF9F43",
-  qa: "#C9A84C",
-  close: "#6C63FF",
 };
 
-function useCountdown(days) {
-  const target = new Date();
-  target.setDate(target.getDate() + days);
+const fallbackSpeakers = [
+  {
+    id: "fallback-1",
+    name: "Glayds Gand",
+    role: "Mentora · Acelera 4.0",
+    topic: "Carreira com Propósito",
+    avatar: "GG",
+    color: "#C9A84C",
+  },
+];
 
-  const [time, setTime] = useState({ d: days, h: 0, m: 0, s: 0 });
+function useCountdown(targetDate) {
+  const [time, setTime] = useState({ d: 0, h: 0, m: 0, s: 0 });
 
   useEffect(() => {
+    const target = new Date(targetDate);
+
     const tick = () => {
       const now = new Date();
       const diff = target - now;
 
-      if (diff <= 0) return;
+      if (diff <= 0) {
+        setTime({ d: 0, h: 0, m: 0, s: 0 });
+        return;
+      }
 
       setTime({
         d: Math.floor(diff / 86400000),
@@ -134,7 +140,7 @@ function useCountdown(days) {
     tick();
     const i = setInterval(tick, 1000);
     return () => clearInterval(i);
-  }, []);
+  }, [targetDate]);
 
   return time;
 }
@@ -147,7 +153,16 @@ export default function App() {
   const [expandedModule, setExpandedModule] = useState(null);
   const [speakers, setSpeakers] = useState([]);
 
-  const countdown = useCountdown(mockUser.daysLeft);
+  const userAvatar = mockUser.avatar || getInitials(mockUser.name);
+  const countdown = useCountdown(mockUser.eventDate);
+
+  const completedModules = modules.filter((m) => m.completed).length;
+  const progress =
+    modules.length > 0
+      ? Math.round((completedModules / modules.length) * 100)
+      : 0;
+
+  const displayedSpeakers = speakers.length > 0 ? speakers : fallbackSpeakers;
 
   useEffect(() => {
     async function fetchSpeakers() {
@@ -182,7 +197,7 @@ export default function App() {
       {
         id: Date.now(),
         user: mockUser.name.split(" ")[0] + " N.",
-        avatar: mockUser.avatar,
+        avatar: userAvatar,
         time: "agora",
         msg: newMsg,
         likes: 0,
@@ -220,11 +235,6 @@ export default function App() {
         @keyframes pulseRing { 0%,100%{box-shadow:0 0 0 0 rgba(201,168,76,0.4);} 50%{box-shadow:0 0 0 12px rgba(201,168,76,0);} }
         .shimmer { background: linear-gradient(90deg, transparent 0%, rgba(201,168,76,0.08) 50%, transparent 100%); background-size: 200% 100%; animation: shimmer 2.5s infinite; }
         @keyframes shimmer { 0%{background-position:200% 0;} 100%{background-position:-200% 0;} }
-        .card-hover { transition: transform 0.2s, box-shadow 0.2s; }
-        .card-hover:active { transform: scale(0.98); }
-        .glow-gold { box-shadow: 0 0 20px rgba(201,168,76,0.2); }
-        input, textarea { outline: none; }
-        textarea:focus { border-color: rgba(201,168,76,0.5) !important; }
       `}</style>
 
       <div
@@ -248,13 +258,15 @@ export default function App() {
         >
           <div>
             <img
-              src="https://artjsvhhkusuoaifxcpl.supabase.co/storage/v1/object/sign/logo-acelera/1.Acelera%20-%20carreira%20com%20proposito%20-%20Logotipo%20(laranja).png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9lNGI5ZGM3Ny1iN2FhLTQwM2MtOGExZi0yNzQ1ZmY1ODQ4NTEiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJsb2dvLWFjZWxlcmEvMS5BY2VsZXJhIC0gY2FycmVpcmEgY29tIHByb3Bvc2l0byAtIExvZ290aXBvIChsYXJhbmphKS5wbmciLCJpYXQiOjE3NzgzMzk5MDgsImV4cCI6NDkzMTkzOTkwOH0.rDZoUrRFHtpmcx9uYsLnyxcbwKhlxVPGFpH-7xP-OMU"
+              src="https://artjsvhhkusuoaifxcpl.supabase.co/storage/v1/object/sign/logo-acelera/WhatsApp%20Image%202026-05-09%20at%2017.43.46.jpeg?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9lNGI5ZGM3Ny1iN2FhLTQwM2MtOGExZi0yNzQ1ZmY1ODQ4NTEiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJsb2dvLWFjZWxlcmEvV2hhdHNBcHAgSW1hZ2UgMjAyNi0wNS0wOSBhdCAxNy40My40Ni5qcGVnIiwiaWF0IjoxNzc4MzQxNjY4LCJleHAiOjE4NDE0MTM2Njh9.4XliF9nN6m512YmixQgz2fULG9hN9muEDeR7bcOIbws"
               alt="Acelera"
               style={{
-                width: 120,
+                width: "100%",
+                maxWidth: 500,
                 height: "auto",
-                marginBottom: 10,
+                margin: "0 auto 20px",
                 objectFit: "contain",
+                display: "block",
               }}
             />
 
@@ -271,6 +283,7 @@ export default function App() {
               <span style={{ color: COLORS.gold }}>{mockUser.edition}</span>
             </div>
           </div>
+
           <div
             className="pulse-ring"
             style={{
@@ -285,10 +298,9 @@ export default function App() {
               fontWeight: 700,
               fontSize: 14,
               color: COLORS.obsidian,
-              cursor: "pointer",
             }}
           >
-            {mockUser.avatar}
+            {userAvatar}
           </div>
         </div>
 
@@ -316,7 +328,6 @@ export default function App() {
                 fontSize: 10,
                 fontFamily: "DM Sans",
                 fontWeight: 500,
-                transition: "all 0.2s",
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
@@ -372,13 +383,7 @@ export default function App() {
                 position: "relative",
                 overflow: "hidden",
               }}
-              className="glow-gold"
             >
-              <div
-                className="shimmer"
-                style={{ position: "absolute", inset: 0, borderRadius: 16 }}
-              />
-
               <div
                 className="sans"
                 style={{
@@ -390,6 +395,17 @@ export default function App() {
                 }}
               >
                 Contagem Regressiva
+              </div>
+
+              <div
+                className="sans"
+                style={{
+                  fontSize: 12,
+                  color: COLORS.muted,
+                  marginBottom: 12,
+                }}
+              >
+                Data provisória: {mockUser.eventMonthLabel}
               </div>
 
               <div
@@ -441,18 +457,6 @@ export default function App() {
                   </div>
                 ))}
               </div>
-
-              <div
-                className="sans"
-                style={{
-                  fontSize: 12,
-                  color: COLORS.muted,
-                  marginTop: 12,
-                  textAlign: "center",
-                }}
-              >
-                📍 Hotel Polana · Maputo · Sala Grandes Nomes
-              </div>
             </div>
 
             <div
@@ -480,7 +484,7 @@ export default function App() {
                   className="serif"
                   style={{ fontSize: 18, color: COLORS.gold, fontWeight: 700 }}
                 >
-                  {mockUser.progress}%
+                  {String(progress).padStart(2, "0")}%
                 </div>
               </div>
 
@@ -494,7 +498,7 @@ export default function App() {
               >
                 <div
                   style={{
-                    width: `${mockUser.progress}%`,
+                    width: `${progress}%`,
                     height: "100%",
                     background: `linear-gradient(90deg, ${COLORS.gold}, ${COLORS.goldLight})`,
                     borderRadius: 99,
@@ -507,7 +511,7 @@ export default function App() {
                 className="sans"
                 style={{ fontSize: 11, color: COLORS.muted, marginTop: 8 }}
               >
-                2 de 4 módulos concluídos · continua assim 🔥
+                {completedModules} de {modules.length} módulos concluídos
               </div>
             </div>
 
@@ -532,26 +536,9 @@ export default function App() {
                 marginBottom: 16,
               }}
             >
-              {speakers.length === 0 && (
-                <div
-                  className="sans"
-                  style={{
-                    fontSize: 12,
-                    color: COLORS.muted,
-                    background: COLORS.card,
-                    border: `1px solid ${COLORS.border}`,
-                    borderRadius: 12,
-                    padding: 14,
-                  }}
-                >
-                  Ainda não há oradores cadastrados no Supabase.
-                </div>
-              )}
-
-              {speakers.map((s, i) => (
+              {displayedSpeakers.map((s, i) => (
                 <div
                   key={s.id || i}
-                  className="card-hover"
                   style={{
                     background: COLORS.card,
                     border: `1px solid ${COLORS.border}`,
@@ -567,9 +554,7 @@ export default function App() {
                       width: 44,
                       height: 44,
                       borderRadius: "50%",
-                      background: `linear-gradient(135deg, ${
-                        s.color || COLORS.gold
-                      }33, ${s.color || COLORS.gold}66)`,
+                      background: `${s.color || COLORS.gold}22`,
                       border: `2px solid ${s.color || COLORS.gold}44`,
                       display: "flex",
                       alignItems: "center",
@@ -578,10 +563,9 @@ export default function App() {
                       fontWeight: 700,
                       fontSize: 13,
                       color: s.color || COLORS.gold,
-                      flexShrink: 0,
                     }}
                   >
-                    {s.avatar || "?"}
+                    {s.avatar || "GG"}
                   </div>
 
                   <div style={{ flex: 1 }}>
@@ -617,40 +601,6 @@ export default function App() {
                 </div>
               ))}
             </div>
-
-            <div
-              style={{
-                background: `linear-gradient(135deg, ${COLORS.goldGlow}, transparent)`,
-                border: `1px solid rgba(201,168,76,0.2)`,
-                borderRadius: 16,
-                padding: 20,
-                textAlign: "center",
-              }}
-            >
-              <div
-                className="serif"
-                style={{
-                  fontSize: 18,
-                  fontStyle: "italic",
-                  color: COLORS.white,
-                  lineHeight: 1.5,
-                }}
-              >
-                "Não é o evento que muda o negócio — é a pessoa que sais de lá."
-              </div>
-
-              <div
-                className="sans"
-                style={{
-                  fontSize: 11,
-                  color: COLORS.gold,
-                  marginTop: 8,
-                  letterSpacing: 1,
-                }}
-              >
-                — Empreende & Escala Vol. 3
-              </div>
-            </div>
           </div>
         )}
 
@@ -660,127 +610,54 @@ export default function App() {
               <div className="serif" style={{ fontSize: 22, fontWeight: 700 }}>
                 Módulos <span style={{ color: COLORS.gold }}>Pré-Evento</span>
               </div>
-
-              <div
-                className="sans"
-                style={{ fontSize: 12, color: COLORS.muted, marginTop: 4 }}
-              >
-                Prepara a tua mente antes de chegares.
-              </div>
             </div>
 
             {modules.map((m) => (
               <div
                 key={m.id}
-                className="card-hover"
                 onClick={() =>
                   m.unlocked &&
                   setExpandedModule(expandedModule === m.id ? null : m.id)
                 }
                 style={{
                   background: m.unlocked ? COLORS.card : `${COLORS.card}88`,
-                  border: `1px solid ${
-                    m.unlocked ? COLORS.border : COLORS.border + "55"
-                  }`,
+                  border: `1px solid ${COLORS.border}`,
                   borderRadius: 14,
                   padding: 16,
                   marginBottom: 10,
                   opacity: m.unlocked ? 1 : 0.6,
                   cursor: m.unlocked ? "pointer" : "default",
-                  transition: "all 0.25s",
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <div
-                    style={{
-                      width: 46,
-                      height: 46,
-                      borderRadius: 12,
-                      background: m.unlocked ? COLORS.goldGlow : COLORS.surface,
-                      border: `1px solid ${
-                        m.unlocked ? COLORS.gold + "44" : COLORS.border
-                      }`,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: 22,
-                      flexShrink: 0,
-                    }}
-                  >
-                    {m.icon}
-                  </div>
-
-                  <div style={{ flex: 1 }}>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                      }}
-                    >
-                      <div
-                        className="sans"
-                        style={{
-                          fontSize: 14,
-                          fontWeight: 600,
-                          color: m.unlocked ? COLORS.white : COLORS.muted,
-                        }}
-                      >
-                        {m.title}
-                      </div>
-
-                      {!m.unlocked && <span style={{ fontSize: 14 }}>🔒</span>}
-                    </div>
-
+                  <div style={{ fontSize: 24 }}>{m.icon}</div>
+                  <div>
                     <div
                       className="sans"
-                      style={{
-                        fontSize: 11,
-                        color: COLORS.muted,
-                        marginTop: 3,
-                      }}
+                      style={{ fontSize: 14, fontWeight: 600 }}
+                    >
+                      {m.title}
+                    </div>
+                    <div
+                      className="sans"
+                      style={{ fontSize: 11, color: COLORS.muted }}
                     >
                       {m.duration}
                     </div>
                   </div>
                 </div>
 
-                {m.unlocked && expandedModule === m.id && (
+                {expandedModule === m.id && (
                   <div
+                    className="sans"
                     style={{
-                      marginTop: 14,
-                      paddingTop: 14,
+                      marginTop: 12,
+                      paddingTop: 12,
                       borderTop: `1px solid ${COLORS.border}`,
+                      fontSize: 13,
                     }}
                   >
-                    <div
-                      className="sans"
-                      style={{
-                        fontSize: 13,
-                        color: COLORS.white,
-                        lineHeight: 1.6,
-                      }}
-                    >
-                      {m.teaser}
-                    </div>
-
-                    <button
-                      style={{
-                        marginTop: 12,
-                        width: "100%",
-                        background: `linear-gradient(135deg, ${COLORS.gold}, #8B6914)`,
-                        border: "none",
-                        borderRadius: 10,
-                        padding: "12px",
-                        fontFamily: "DM Sans",
-                        fontWeight: 700,
-                        fontSize: 14,
-                        color: COLORS.obsidian,
-                        cursor: "pointer",
-                      }}
-                    >
-                      ▶ Assistir Módulo
-                    </button>
+                    {m.teaser}
                   </div>
                 )}
               </div>
@@ -792,165 +669,59 @@ export default function App() {
           <div className="tab-content">
             <div style={{ padding: "20px 0 16px" }}>
               <div className="serif" style={{ fontSize: 22, fontWeight: 700 }}>
-                Comunidade <span style={{ color: COLORS.gold }}>✦</span>
-              </div>
-
-              <div
-                className="sans"
-                style={{ fontSize: 12, color: COLORS.muted, marginTop: 2 }}
-              >
-                {posts.length} participantes activos agora
+                Comunidade
               </div>
             </div>
 
-            <div
+            <textarea
+              value={newMsg}
+              onChange={(e) => setNewMsg(e.target.value)}
+              placeholder="Partilha uma ideia, dúvida ou conquista..."
               style={{
+                width: "100%",
                 background: COLORS.card,
                 border: `1px solid ${COLORS.border}`,
-                borderRadius: 14,
-                padding: 14,
-                marginBottom: 16,
+                borderRadius: 8,
+                padding: 12,
+                color: COLORS.white,
+                fontFamily: "DM Sans",
+                fontSize: 13,
+                resize: "none",
+                height: 80,
+              }}
+            />
+
+            <button
+              onClick={sendMsg}
+              style={{
+                marginTop: 10,
+                background: COLORS.gold,
+                border: "none",
+                borderRadius: 8,
+                padding: "8px 18px",
+                fontWeight: 700,
+                color: COLORS.obsidian,
               }}
             >
-              <textarea
-                value={newMsg}
-                onChange={(e) => setNewMsg(e.target.value)}
-                placeholder="Partilha uma ideia, dúvida ou conquista..."
-                style={{
-                  width: "100%",
-                  background: "transparent",
-                  border: `1px solid ${COLORS.border}`,
-                  borderRadius: 8,
-                  padding: "10px 12px",
-                  color: COLORS.white,
-                  fontFamily: "DM Sans",
-                  fontSize: 13,
-                  resize: "none",
-                  height: 80,
-                  transition: "border 0.2s",
-                }}
-              />
-
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginTop: 10,
-                }}
-              >
-                <div
-                  className="sans"
-                  style={{ fontSize: 11, color: COLORS.muted }}
-                >
-                  Visível para todos os participantes
-                </div>
-
-                <button
-                  onClick={sendMsg}
-                  style={{
-                    background: `linear-gradient(135deg, ${COLORS.gold}, #8B6914)`,
-                    border: "none",
-                    borderRadius: 8,
-                    padding: "8px 18px",
-                    fontFamily: "DM Sans",
-                    fontWeight: 700,
-                    fontSize: 13,
-                    color: COLORS.obsidian,
-                    cursor: "pointer",
-                  }}
-                >
-                  Publicar
-                </button>
-              </div>
-            </div>
+              Publicar
+            </button>
 
             {posts.map((p) => (
               <div
                 key={p.id}
-                className="card-hover"
                 style={{
                   background: COLORS.card,
                   border: `1px solid ${COLORS.border}`,
                   borderRadius: 14,
                   padding: 14,
-                  marginBottom: 10,
+                  marginTop: 10,
                 }}
               >
-                <div style={{ display: "flex", gap: 10, marginBottom: 8 }}>
-                  <div
-                    style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: "50%",
-                      background: `${p.color}22`,
-                      border: `1px solid ${p.color}44`,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontFamily: "DM Sans",
-                      fontWeight: 700,
-                      fontSize: 12,
-                      color: p.color,
-                      flexShrink: 0,
-                    }}
-                  >
-                    {p.avatar}
-                  </div>
-
-                  <div>
-                    <div
-                      className="sans"
-                      style={{ fontSize: 13, fontWeight: 600 }}
-                    >
-                      {p.user}
-                    </div>
-
-                    <div
-                      className="sans"
-                      style={{ fontSize: 11, color: COLORS.muted }}
-                    >
-                      {p.time}
-                    </div>
-                  </div>
+                <div className="sans" style={{ fontSize: 13, fontWeight: 600 }}>
+                  {p.avatar} · {p.user}
                 </div>
-
-                <div
-                  className="sans"
-                  style={{ fontSize: 13, color: COLORS.white, lineHeight: 1.6 }}
-                >
+                <div className="sans" style={{ fontSize: 13, marginTop: 8 }}>
                   {p.msg}
-                </div>
-
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    marginTop: 10,
-                  }}
-                >
-                  <button
-                    onClick={() => toggleLike(p.id)}
-                    style={{
-                      background: liked[p.id] ? COLORS.goldGlow : "transparent",
-                      border: `1px solid ${
-                        liked[p.id] ? COLORS.gold + "44" : COLORS.border
-                      }`,
-                      borderRadius: 20,
-                      padding: "4px 12px",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 5,
-                      color: liked[p.id] ? COLORS.gold : COLORS.muted,
-                      fontFamily: "DM Sans",
-                      fontSize: 12,
-                      transition: "all 0.2s",
-                    }}
-                  >
-                    {liked[p.id] ? "♥" : "♡"} {p.likes}
-                  </button>
                 </div>
               </div>
             ))}
@@ -961,236 +732,35 @@ export default function App() {
           <div className="tab-content">
             <div style={{ padding: "20px 0 16px" }}>
               <div className="serif" style={{ fontSize: 22, fontWeight: 700 }}>
-                O <span style={{ color: COLORS.gold }}>Evento</span>
+                O Evento
               </div>
+            </div>
 
+            {agenda.map((a, i) => (
               <div
-                className="sans"
-                style={{ fontSize: 12, color: COLORS.muted, marginTop: 2 }}
-              >
-                Sabe o que te espera.
-              </div>
-            </div>
-
-            <div
-              style={{
-                background: `linear-gradient(135deg, #1A1628, #0F1420)`,
-                border: `1px solid rgba(108,99,255,0.3)`,
-                borderRadius: 16,
-                padding: 16,
-                marginBottom: 16,
-              }}
-            >
-              <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                <div
-                  style={{
-                    width: 48,
-                    height: 48,
-                    borderRadius: 12,
-                    background: COLORS.accentGlow,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: 24,
-                  }}
-                >
-                  📍
-                </div>
-
-                <div>
-                  <div
-                    className="sans"
-                    style={{ fontSize: 14, fontWeight: 600 }}
-                  >
-                    Hotel Polana — Sala Grandes Nomes
-                  </div>
-
-                  <div
-                    className="sans"
-                    style={{ fontSize: 12, color: COLORS.muted }}
-                  >
-                    Av. Julius Nyerere, Maputo
-                  </div>
-
-                  <a
-                    href="https://maps.google.com/?q=Hotel+Polana+Maputo"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="sans"
-                    style={{
-                      fontSize: 12,
-                      color: "#9B94FF",
-                      marginTop: 2,
-                      textDecoration: "none",
-                      display: "inline-block",
-                    }}
-                  >
-                    Ver no mapa →
-                  </a>
-                </div>
-              </div>
-            </div>
-
-            <div
-              className="sans"
-              style={{
-                fontSize: 12,
-                color: COLORS.muted,
-                letterSpacing: 2,
-                textTransform: "uppercase",
-                marginBottom: 12,
-              }}
-            >
-              Agenda do Dia
-            </div>
-
-            <div style={{ position: "relative" }}>
-              <div
+                key={i}
                 style={{
-                  position: "absolute",
-                  left: 42,
-                  top: 0,
-                  bottom: 0,
-                  width: 1,
-                  background: COLORS.border,
+                  background: COLORS.card,
+                  border: `1px solid ${COLORS.border}`,
+                  borderRadius: 10,
+                  padding: "8px 12px",
+                  marginBottom: 10,
                 }}
-              />
-
-              {agenda.map((a, i) => (
-                <div
-                  key={i}
-                  style={{
-                    display: "flex",
-                    gap: 12,
-                    marginBottom: 12,
-                    alignItems: "flex-start",
-                  }}
-                >
-                  <div
-                    className="sans"
-                    style={{
-                      fontSize: 11,
-                      color: COLORS.muted,
-                      width: 36,
-                      textAlign: "right",
-                      paddingTop: 10,
-                      flexShrink: 0,
-                    }}
-                  >
-                    {a.time}
-                  </div>
-
-                  <div
-                    style={{
-                      width: 12,
-                      height: 12,
-                      borderRadius: "50%",
-                      background: typeColors[a.type],
-                      border: `2px solid ${COLORS.obsidian}`,
-                      flexShrink: 0,
-                      marginTop: 10,
-                      zIndex: 1,
-                    }}
-                  />
-
-                  <div
-                    style={{
-                      flex: 1,
-                      background: COLORS.card,
-                      border: `1px solid ${COLORS.border}`,
-                      borderRadius: 10,
-                      padding: "8px 12px",
-                    }}
-                  >
-                    <div
-                      className="sans"
-                      style={{
-                        fontSize: 13,
-                        fontWeight: 500,
-                        color: COLORS.white,
-                      }}
-                    >
-                      {a.title}
-                    </div>
-
-                    <span
-                      className="sans"
-                      style={{
-                        fontSize: 10,
-                        color: typeColors[a.type],
-                        textTransform: "capitalize",
-                      }}
-                    >
-                      {a.type}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div
-              style={{
-                background: COLORS.card,
-                border: `1px solid ${COLORS.border}`,
-                borderRadius: 14,
-                padding: 16,
-                marginTop: 8,
-              }}
-            >
-              <div
-                className="sans"
-                style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}
               >
-                O que trazer 📋
-              </div>
-
-              {[
-                "Bilhete (este app funciona como bilhete)",
-                "Cartão de visita ou contacto digital",
-                "Bloco de notas — vai querer escrever muito",
-                "Mente aberta e sede de crescer",
-              ].map((item, i) => (
                 <div
-                  key={i}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    marginBottom: 8,
-                  }}
+                  className="sans"
+                  style={{ fontSize: 11, color: COLORS.muted }}
                 >
-                  <div
-                    style={{
-                      width: 20,
-                      height: 20,
-                      borderRadius: "50%",
-                      background: COLORS.goldGlow,
-                      border: `1px solid ${COLORS.gold}44`,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: 10,
-                      color: COLORS.gold,
-                      flexShrink: 0,
-                    }}
-                  >
-                    ✓
-                  </div>
-
-                  <div
-                    className="sans"
-                    style={{ fontSize: 12, color: COLORS.muted }}
-                  >
-                    {item}
-                  </div>
+                  {a.time}
                 </div>
-              ))}
-            </div>
+                <div className="sans" style={{ fontSize: 13 }}>
+                  {a.title}
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
-
-      <div style={{ height: 20, background: COLORS.obsidian }} />
     </div>
   );
 }
