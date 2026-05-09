@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "./supabaseClient";
 
 const COLORS = {
   obsidian: "#0A0A0F",
@@ -17,9 +18,9 @@ const COLORS = {
 };
 
 const mockUser = {
-  name: "Beatriz Nhampule",
-  course: "Empreende & Escala",
-  edition: "Vol. 3",
+  name: "Dadiva Gulele",
+  course: "Acelera - Carreira Com Propósito",
+  edition: "4.0",
   daysLeft: 12,
   avatar: "BN",
   progress: 65,
@@ -80,48 +81,6 @@ const community = [
     likes: 7,
     color: "#6C63FF",
   },
-  {
-    id: 3,
-    user: "Jorge A.",
-    avatar: "JA",
-    time: "há 6h",
-    msg: "Dúvida: o certificado é enviado por email depois? Perguntei no suporte mas ainda aguardo.",
-    likes: 2,
-    color: "#4CAF8C",
-  },
-  {
-    id: 4,
-    user: "Nilza P.",
-    avatar: "NP",
-    time: "ontem",
-    msg: "Módulo 2 mudou a forma como vejo o meu salão. Finalmente entendo o que me diferencia! 💅✨",
-    likes: 21,
-    color: "#E8637A",
-  },
-];
-
-const speakers = [
-  {
-    name: "Dr. Armando Sitoe",
-    role: "CEO · FinançasMZ",
-    topic: "Escalar sem Capital Externo",
-    avatar: "AS",
-    color: "#C9A84C",
-  },
-  {
-    name: "Sra. Ivone Macome",
-    role: "Fundadora · TechFem",
-    topic: "Liderança Feminina no Negócio",
-    avatar: "IM",
-    color: "#6C63FF",
-  },
-  {
-    name: "Miguel Tembe",
-    role: "Mentor · ScaleUp Africa",
-    topic: "De 0 a 1M em 18 Meses",
-    avatar: "MT",
-    color: "#4CAF8C",
-  },
 ];
 
 const agenda = [
@@ -151,16 +110,19 @@ const typeColors = {
   close: "#6C63FF",
 };
 
-// Countdown
 function useCountdown(days) {
   const target = new Date();
   target.setDate(target.getDate() + days);
+
   const [time, setTime] = useState({ d: days, h: 0, m: 0, s: 0 });
+
   useEffect(() => {
     const tick = () => {
       const now = new Date();
       const diff = target - now;
+
       if (diff <= 0) return;
+
       setTime({
         d: Math.floor(diff / 86400000),
         h: Math.floor((diff % 86400000) / 3600000),
@@ -168,10 +130,12 @@ function useCountdown(days) {
         s: Math.floor((diff % 60000) / 1000),
       });
     };
+
     tick();
     const i = setInterval(tick, 1000);
     return () => clearInterval(i);
   }, []);
+
   return time;
 }
 
@@ -181,7 +145,24 @@ export default function App() {
   const [newMsg, setNewMsg] = useState("");
   const [posts, setPosts] = useState(community);
   const [expandedModule, setExpandedModule] = useState(null);
+  const [speakers, setSpeakers] = useState([]);
+
   const countdown = useCountdown(mockUser.daysLeft);
+
+  useEffect(() => {
+    async function fetchSpeakers() {
+      const { data, error } = await supabase.from("speakers").select("*");
+
+      if (error) {
+        console.log("Erro ao buscar speakers:", error);
+        return;
+      }
+
+      setSpeakers(data || []);
+    }
+
+    fetchSpeakers();
+  }, []);
 
   const toggleLike = (id) => {
     setLiked((p) => ({ ...p, [id]: !p[id] }));
@@ -196,6 +177,7 @@ export default function App() {
 
   const sendMsg = () => {
     if (!newMsg.trim()) return;
+
     setPosts((p) => [
       {
         id: Date.now(),
@@ -208,6 +190,7 @@ export default function App() {
       },
       ...p,
     ]);
+
     setNewMsg("");
   };
 
@@ -244,7 +227,6 @@ export default function App() {
         textarea:focus { border-color: rgba(201,168,76,0.5) !important; }
       `}</style>
 
-      {/* Header */}
       <div
         style={{
           background: `linear-gradient(180deg, ${COLORS.deep} 0%, transparent 100%)`,
@@ -265,21 +247,21 @@ export default function App() {
           }}
         >
           <div>
-            <div
-              className="serif"
+            <img
+              src="https://artjsvhhkusuoaifxcpl.supabase.co/storage/v1/object/sign/logo-acelera/1.Acelera%20-%20carreira%20com%20proposito%20-%20Logotipo%20(laranja).png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9lNGI5ZGM3Ny1iN2FhLTQwM2MtOGExZi0yNzQ1ZmY1ODQ4NTEiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJsb2dvLWFjZWxlcmEvMS5BY2VsZXJhIC0gY2FycmVpcmEgY29tIHByb3Bvc2l0byAtIExvZ290aXBvIChsYXJhbmphKS5wbmciLCJpYXQiOjE3NzgzMzk5MDgsImV4cCI6NDkzMTkzOTkwOH0.rDZoUrRFHtpmcx9uYsLnyxcbwKhlxVPGFpH-7xP-OMU"
+              alt="Acelera"
               style={{
-                fontSize: 11,
-                color: COLORS.gold,
-                letterSpacing: 3,
-                textTransform: "uppercase",
+                width: 120,
+                height: "auto",
+                marginBottom: 10,
+                objectFit: "contain",
               }}
-            >
-              Acesso Exclusivo
-            </div>
+            />
+
             <div
               className="serif"
               style={{
-                fontSize: 20,
+                fontSize: 16,
                 fontWeight: 700,
                 color: COLORS.white,
                 lineHeight: 1.2,
@@ -310,7 +292,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* Nav */}
         <div style={{ display: "flex", gap: 4, padding: "8px 0" }}>
           {[
             { id: "home", icon: "✦", label: "Início" },
@@ -349,12 +330,9 @@ export default function App() {
         </div>
       </div>
 
-      {/* Content area */}
       <div style={{ padding: "0 16px 100px", overflow: "auto" }}>
-        {/* HOME TAB */}
         {tab === "home" && (
           <div className="tab-content">
-            {/* Welcome */}
             <div style={{ padding: "20px 0 16px" }}>
               <div
                 className="sans"
@@ -362,6 +340,7 @@ export default function App() {
               >
                 Olá de volta,
               </div>
+
               <div
                 className="serif"
                 style={{
@@ -374,6 +353,7 @@ export default function App() {
                 {mockUser.name.split(" ")[0]}{" "}
                 <span style={{ color: COLORS.gold }}>✦</span>
               </div>
+
               <div
                 className="sans"
                 style={{ fontSize: 13, color: COLORS.muted, marginTop: 4 }}
@@ -382,7 +362,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Countdown card */}
             <div
               style={{
                 background: `linear-gradient(135deg, #1A1628 0%, #0F0F1A 100%)`,
@@ -399,6 +378,7 @@ export default function App() {
                 className="shimmer"
                 style={{ position: "absolute", inset: 0, borderRadius: 16 }}
               />
+
               <div
                 className="sans"
                 style={{
@@ -411,6 +391,7 @@ export default function App() {
               >
                 Contagem Regressiva
               </div>
+
               <div
                 style={{
                   display: "grid",
@@ -444,6 +425,7 @@ export default function App() {
                     >
                       {String(countdown[k]).padStart(2, "0")}
                     </div>
+
                     <div
                       className="sans"
                       style={{
@@ -459,6 +441,7 @@ export default function App() {
                   </div>
                 ))}
               </div>
+
               <div
                 className="sans"
                 style={{
@@ -472,7 +455,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Progress */}
             <div
               style={{
                 background: COLORS.card,
@@ -493,6 +475,7 @@ export default function App() {
                 <div className="sans" style={{ fontSize: 13, fontWeight: 500 }}>
                   Preparação Pré-Evento
                 </div>
+
                 <div
                   className="serif"
                   style={{ fontSize: 18, color: COLORS.gold, fontWeight: 700 }}
@@ -500,6 +483,7 @@ export default function App() {
                   {mockUser.progress}%
                 </div>
               </div>
+
               <div
                 style={{
                   background: COLORS.border,
@@ -518,6 +502,7 @@ export default function App() {
                   }}
                 />
               </div>
+
               <div
                 className="sans"
                 style={{ fontSize: 11, color: COLORS.muted, marginTop: 8 }}
@@ -526,7 +511,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Speakers preview */}
             <div
               className="sans"
               style={{
@@ -539,6 +523,7 @@ export default function App() {
             >
               Quem vais encontrar
             </div>
+
             <div
               style={{
                 display: "flex",
@@ -547,9 +532,25 @@ export default function App() {
                 marginBottom: 16,
               }}
             >
+              {speakers.length === 0 && (
+                <div
+                  className="sans"
+                  style={{
+                    fontSize: 12,
+                    color: COLORS.muted,
+                    background: COLORS.card,
+                    border: `1px solid ${COLORS.border}`,
+                    borderRadius: 12,
+                    padding: 14,
+                  }}
+                >
+                  Ainda não há oradores cadastrados no Supabase.
+                </div>
+              )}
+
               {speakers.map((s, i) => (
                 <div
-                  key={i}
+                  key={s.id || i}
                   className="card-hover"
                   style={{
                     background: COLORS.card,
@@ -566,20 +567,23 @@ export default function App() {
                       width: 44,
                       height: 44,
                       borderRadius: "50%",
-                      background: `linear-gradient(135deg, ${s.color}33, ${s.color}66)`,
-                      border: `2px solid ${s.color}44`,
+                      background: `linear-gradient(135deg, ${
+                        s.color || COLORS.gold
+                      }33, ${s.color || COLORS.gold}66)`,
+                      border: `2px solid ${s.color || COLORS.gold}44`,
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
                       fontFamily: "DM Sans",
                       fontWeight: 700,
                       fontSize: 13,
-                      color: s.color,
+                      color: s.color || COLORS.gold,
                       flexShrink: 0,
                     }}
                   >
-                    {s.avatar}
+                    {s.avatar || "?"}
                   </div>
+
                   <div style={{ flex: 1 }}>
                     <div
                       className="sans"
@@ -591,15 +595,21 @@ export default function App() {
                     >
                       {s.name}
                     </div>
+
                     <div
                       className="sans"
                       style={{ fontSize: 11, color: COLORS.muted }}
                     >
                       {s.role}
                     </div>
+
                     <div
                       className="sans"
-                      style={{ fontSize: 11, color: s.color, marginTop: 2 }}
+                      style={{
+                        fontSize: 11,
+                        color: s.color || COLORS.gold,
+                        marginTop: 2,
+                      }}
                     >
                       "{s.topic}"
                     </div>
@@ -608,7 +618,6 @@ export default function App() {
               ))}
             </div>
 
-            {/* Hype quote */}
             <div
               style={{
                 background: `linear-gradient(135deg, ${COLORS.goldGlow}, transparent)`,
@@ -629,6 +638,7 @@ export default function App() {
               >
                 "Não é o evento que muda o negócio — é a pessoa que sais de lá."
               </div>
+
               <div
                 className="sans"
                 style={{
@@ -644,13 +654,13 @@ export default function App() {
           </div>
         )}
 
-        {/* CONTENT TAB */}
         {tab === "content" && (
           <div className="tab-content">
             <div style={{ padding: "20px 0 16px" }}>
               <div className="serif" style={{ fontSize: 22, fontWeight: 700 }}>
                 Módulos <span style={{ color: COLORS.gold }}>Pré-Evento</span>
               </div>
+
               <div
                 className="sans"
                 style={{ fontSize: 12, color: COLORS.muted, marginTop: 4 }}
@@ -658,7 +668,8 @@ export default function App() {
                 Prepara a tua mente antes de chegares.
               </div>
             </div>
-            {modules.map((m, i) => (
+
+            {modules.map((m) => (
               <div
                 key={m.id}
                 className="card-hover"
@@ -698,6 +709,7 @@ export default function App() {
                   >
                     {m.icon}
                   </div>
+
                   <div style={{ flex: 1 }}>
                     <div
                       style={{
@@ -716,8 +728,10 @@ export default function App() {
                       >
                         {m.title}
                       </div>
+
                       {!m.unlocked && <span style={{ fontSize: 14 }}>🔒</span>}
                     </div>
+
                     <div
                       className="sans"
                       style={{
@@ -730,6 +744,7 @@ export default function App() {
                     </div>
                   </div>
                 </div>
+
                 {m.unlocked && expandedModule === m.id && (
                   <div
                     style={{
@@ -748,6 +763,7 @@ export default function App() {
                     >
                       {m.teaser}
                     </div>
+
                     <button
                       style={{
                         marginTop: 12,
@@ -767,57 +783,18 @@ export default function App() {
                     </button>
                   </div>
                 )}
-                {!m.unlocked && (
-                  <div
-                    style={{
-                      marginTop: 10,
-                      padding: "8px 12px",
-                      background: COLORS.surface,
-                      borderRadius: 8,
-                    }}
-                  >
-                    <div
-                      className="sans"
-                      style={{ fontSize: 12, color: COLORS.muted }}
-                    >
-                      {m.teaser}
-                    </div>
-                  </div>
-                )}
               </div>
             ))}
-
-            <div
-              style={{
-                background: COLORS.accentGlow,
-                border: `1px solid rgba(108,99,255,0.3)`,
-                borderRadius: 14,
-                padding: 16,
-                marginTop: 8,
-              }}
-            >
-              <div
-                className="sans"
-                style={{ fontSize: 12, color: "#9B94FF", lineHeight: 1.6 }}
-              >
-                🎁{" "}
-                <strong style={{ color: COLORS.white }}>
-                  Bónus exclusivo:
-                </strong>{" "}
-                Quem completa os 2 módulos disponíveis recebe um workbook
-                impresso entregue no evento.
-              </div>
-            </div>
           </div>
         )}
 
-        {/* COMMUNITY TAB */}
         {tab === "community" && (
           <div className="tab-content">
             <div style={{ padding: "20px 0 16px" }}>
               <div className="serif" style={{ fontSize: 22, fontWeight: 700 }}>
                 Comunidade <span style={{ color: COLORS.gold }}>✦</span>
               </div>
+
               <div
                 className="sans"
                 style={{ fontSize: 12, color: COLORS.muted, marginTop: 2 }}
@@ -826,7 +803,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Post input */}
             <div
               style={{
                 background: COLORS.card,
@@ -854,6 +830,7 @@ export default function App() {
                   transition: "border 0.2s",
                 }}
               />
+
               <div
                 style={{
                   display: "flex",
@@ -868,6 +845,7 @@ export default function App() {
                 >
                   Visível para todos os participantes
                 </div>
+
                 <button
                   onClick={sendMsg}
                   style={{
@@ -887,7 +865,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Posts */}
             {posts.map((p) => (
               <div
                 key={p.id}
@@ -920,6 +897,7 @@ export default function App() {
                   >
                     {p.avatar}
                   </div>
+
                   <div>
                     <div
                       className="sans"
@@ -927,6 +905,7 @@ export default function App() {
                     >
                       {p.user}
                     </div>
+
                     <div
                       className="sans"
                       style={{ fontSize: 11, color: COLORS.muted }}
@@ -935,12 +914,14 @@ export default function App() {
                     </div>
                   </div>
                 </div>
+
                 <div
                   className="sans"
                   style={{ fontSize: 13, color: COLORS.white, lineHeight: 1.6 }}
                 >
                   {p.msg}
                 </div>
+
                 <div
                   style={{
                     display: "flex",
@@ -970,33 +951,19 @@ export default function App() {
                   >
                     {liked[p.id] ? "♥" : "♡"} {p.likes}
                   </button>
-                  <button
-                    style={{
-                      background: "transparent",
-                      border: `1px solid ${COLORS.border}`,
-                      borderRadius: 20,
-                      padding: "4px 12px",
-                      cursor: "pointer",
-                      color: COLORS.muted,
-                      fontFamily: "DM Sans",
-                      fontSize: 12,
-                    }}
-                  >
-                    Responder
-                  </button>
                 </div>
               </div>
             ))}
           </div>
         )}
 
-        {/* EVENT TAB */}
         {tab === "event" && (
           <div className="tab-content">
             <div style={{ padding: "20px 0 16px" }}>
               <div className="serif" style={{ fontSize: 22, fontWeight: 700 }}>
                 O <span style={{ color: COLORS.gold }}>Evento</span>
               </div>
+
               <div
                 className="sans"
                 style={{ fontSize: 12, color: COLORS.muted, marginTop: 2 }}
@@ -1005,7 +972,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Location card */}
             <div
               style={{
                 background: `linear-gradient(135deg, #1A1628, #0F1420)`,
@@ -1030,6 +996,7 @@ export default function App() {
                 >
                   📍
                 </div>
+
                 <div>
                   <div
                     className="sans"
@@ -1037,23 +1004,33 @@ export default function App() {
                   >
                     Hotel Polana — Sala Grandes Nomes
                   </div>
+
                   <div
                     className="sans"
                     style={{ fontSize: 12, color: COLORS.muted }}
                   >
                     Av. Julius Nyerere, Maputo
                   </div>
-                  <div
+
+                  <a
+                    href="https://maps.google.com/?q=Hotel+Polana+Maputo"
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="sans"
-                    style={{ fontSize: 12, color: "#9B94FF", marginTop: 2 }}
+                    style={{
+                      fontSize: 12,
+                      color: "#9B94FF",
+                      marginTop: 2,
+                      textDecoration: "none",
+                      display: "inline-block",
+                    }}
                   >
                     Ver no mapa →
-                  </div>
+                  </a>
                 </div>
               </div>
             </div>
 
-            {/* Agenda */}
             <div
               className="sans"
               style={{
@@ -1066,6 +1043,7 @@ export default function App() {
             >
               Agenda do Dia
             </div>
+
             <div style={{ position: "relative" }}>
               <div
                 style={{
@@ -1077,6 +1055,7 @@ export default function App() {
                   background: COLORS.border,
                 }}
               />
+
               {agenda.map((a, i) => (
                 <div
                   key={i}
@@ -1100,6 +1079,7 @@ export default function App() {
                   >
                     {a.time}
                   </div>
+
                   <div
                     style={{
                       width: 12,
@@ -1112,6 +1092,7 @@ export default function App() {
                       zIndex: 1,
                     }}
                   />
+
                   <div
                     style={{
                       flex: 1,
@@ -1131,22 +1112,12 @@ export default function App() {
                     >
                       {a.title}
                     </div>
-                    <div
-                      style={{
-                        width: 6,
-                        height: 6,
-                        borderRadius: 99,
-                        background: typeColors[a.type],
-                        display: "inline-block",
-                        marginTop: 4,
-                      }}
-                    />
+
                     <span
                       className="sans"
                       style={{
                         fontSize: 10,
                         color: typeColors[a.type],
-                        marginLeft: 5,
                         textTransform: "capitalize",
                       }}
                     >
@@ -1157,7 +1128,6 @@ export default function App() {
               ))}
             </div>
 
-            {/* What to bring */}
             <div
               style={{
                 background: COLORS.card,
@@ -1173,6 +1143,7 @@ export default function App() {
               >
                 O que trazer 📋
               </div>
+
               {[
                 "Bilhete (este app funciona como bilhete)",
                 "Cartão de visita ou contacto digital",
@@ -1205,6 +1176,7 @@ export default function App() {
                   >
                     ✓
                   </div>
+
                   <div
                     className="sans"
                     style={{ fontSize: 12, color: COLORS.muted }}
@@ -1218,7 +1190,6 @@ export default function App() {
         )}
       </div>
 
-      {/* Bottom safe area */}
       <div style={{ height: 20, background: COLORS.obsidian }} />
     </div>
   );
