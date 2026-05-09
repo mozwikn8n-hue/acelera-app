@@ -14,6 +14,7 @@ const COLORS = {
   muted: "#8888AA",
   accent: "#6C63FF",
   accentGlow: "rgba(108,99,255,0.2)",
+  success: "#4CAF8C",
 };
 
 const mockUser = {
@@ -23,6 +24,7 @@ const mockUser = {
   eventMonthLabel: "Julho de 2026",
   eventDate: "2026-07-01T00:00:00+02:00",
   avatar: "",
+  progress: 65,
 };
 
 function getInitials(name) {
@@ -37,62 +39,74 @@ function getInitials(name) {
 const modules = [
   {
     id: 1,
-    title: "Autoconhecimento & Dicas Práticas de Aceleração de Carreira",
+    title: "Mentalidade de Fundador",
     unlocked: true,
-    completed: false,
-    icon: "🧭",
+    icon: "🧠",
     teaser:
-      "Uma sessão para reconhecer pontos fortes, desafios e caminhos de crescimento.",
-    duration: "60 min",
+      "Como os maiores empreendedores de África pensam diferente — e como você pode também.",
+    duration: "45 min",
   },
   {
     id: 2,
-    title: "Assessment de Carreira & Plano de Médio Prazo",
+    title: "Posicionamento de Mercado",
     unlocked: true,
-    completed: false,
-    icon: "📌",
-    teaser:
-      "Organiza decisões, prioridades e metas profissionais com mais clareza.",
-    duration: "75 min",
+    icon: "🎯",
+    teaser: "Descobre o teu nicho irresistível e pára de competir por preço.",
+    duration: "60 min",
   },
   {
     id: 3,
-    title: "Liderança – Efeito Multiplicador",
+    title: "Vendas Sem Pressão",
     unlocked: false,
-    completed: false,
-    icon: "✨",
-    teaser: "Desbloqueado durante a jornada.",
-    duration: "60 min",
+    icon: "💎",
+    teaser: "Desbloqueado em 5 dias...",
+    duration: "55 min",
+  },
+  {
+    id: 4,
+    title: "Escalar com Sistemas",
+    unlocked: false,
+    icon: "⚙️",
+    teaser: "Desbloqueado no evento.",
+    duration: "75 min",
   },
 ];
 
 const community = [
   {
     id: 1,
-    user: "Glayds G.",
-    avatar: "GG",
-    time: "agora",
-    msg: "Bem-vindas ao Acelera 4.0. Esta jornada será sobre propósito, estratégia e crescimento consciente.",
-    likes: 0,
+    user: "Carlos M.",
+    avatar: "CM",
+    time: "há 2h",
+    msg: "Já apliquei a técnica do módulo 1 no meu negócio. Resultados em 3 dias! 🔥",
+    likes: 14,
     color: "#C9A84C",
+  },
+  {
+    id: 2,
+    user: "Flávia T.",
+    avatar: "FT",
+    time: "há 4h",
+    msg: "Alguém mais de Maputo que precisa de carona para o evento? Vamos organizar 😊",
+    likes: 7,
+    color: "#6C63FF",
   },
 ];
 
 const agenda = [
   { time: "08:30", title: "Chegada & Networking", type: "network" },
-  { time: "09:00", title: "Abertura da Jornada Acelera 4.0", type: "keynote" },
+  { time: "09:00", title: "Abertura — A Visão do Evento", type: "keynote" },
+  { time: "10:00", title: "Painel: Mentalidade de Escala", type: "panel" },
+  { time: "11:30", title: "Pausa Café & Conexões", type: "break" },
   {
-    time: "10:00",
-    title: "Sessão 1: Autoconhecimento & Carreira",
+    time: "12:00",
+    title: "Workshop: Posicionamento ao Vivo",
     type: "workshop",
   },
-  { time: "12:00", title: "Intervalo & Conexões", type: "break" },
-  { time: "14:00", title: "Sessão 2: Plano de Carreira", type: "workshop" },
-  {
-    time: "16:00",
-    title: "Sessão 3: Liderança e Efeito Multiplicador",
-    type: "panel",
-  },
+  { time: "14:00", title: "Almoço Executivo", type: "break" },
+  { time: "15:30", title: "Cases Reais de Moçambique", type: "case" },
+  { time: "17:00", title: "Sessão Q&A + Desafio 30 Dias", type: "qa" },
+  { time: "18:00", title: "Networking Final & Encerramento", type: "close" },
 ];
 
 const typeColors = {
@@ -101,18 +115,10 @@ const typeColors = {
   workshop: "#4CAF8C",
   network: "#E8637A",
   break: "#8888AA",
+  case: "#FF9F43",
+  qa: "#C9A84C",
+  close: "#6C63FF",
 };
-
-const fallbackSpeakers = [
-  {
-    id: "fallback-1",
-    name: "Glayds Gand",
-    role: "Mentora · Acelera 4.0",
-    topic: "Carreira com Propósito",
-    avatar: "GG",
-    color: "#C9A84C",
-  },
-];
 
 function useCountdown(targetDate) {
   const [time, setTime] = useState({ d: 0, h: 0, m: 0, s: 0 });
@@ -139,6 +145,7 @@ function useCountdown(targetDate) {
 
     tick();
     const i = setInterval(tick, 1000);
+
     return () => clearInterval(i);
   }, [targetDate]);
 
@@ -155,14 +162,6 @@ export default function App() {
 
   const userAvatar = mockUser.avatar || getInitials(mockUser.name);
   const countdown = useCountdown(mockUser.eventDate);
-
-  const completedModules = modules.filter((m) => m.completed).length;
-  const progress =
-    modules.length > 0
-      ? Math.round((completedModules / modules.length) * 100)
-      : 0;
-
-  const displayedSpeakers = speakers.length > 0 ? speakers : fallbackSpeakers;
 
   useEffect(() => {
     async function fetchSpeakers() {
@@ -235,6 +234,11 @@ export default function App() {
         @keyframes pulseRing { 0%,100%{box-shadow:0 0 0 0 rgba(201,168,76,0.4);} 50%{box-shadow:0 0 0 12px rgba(201,168,76,0);} }
         .shimmer { background: linear-gradient(90deg, transparent 0%, rgba(201,168,76,0.08) 50%, transparent 100%); background-size: 200% 100%; animation: shimmer 2.5s infinite; }
         @keyframes shimmer { 0%{background-position:200% 0;} 100%{background-position:-200% 0;} }
+        .card-hover { transition: transform 0.2s, box-shadow 0.2s; }
+        .card-hover:active { transform: scale(0.98); }
+        .glow-gold { box-shadow: 0 0 20px rgba(201,168,76,0.2); }
+        input, textarea { outline: none; }
+        textarea:focus { border-color: rgba(201,168,76,0.5) !important; }
       `}</style>
 
       <div
@@ -298,6 +302,7 @@ export default function App() {
               fontWeight: 700,
               fontSize: 14,
               color: COLORS.obsidian,
+              cursor: "pointer",
             }}
           >
             {userAvatar}
@@ -328,6 +333,7 @@ export default function App() {
                 fontSize: 10,
                 fontFamily: "DM Sans",
                 fontWeight: 500,
+                transition: "all 0.2s",
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
@@ -383,7 +389,13 @@ export default function App() {
                 position: "relative",
                 overflow: "hidden",
               }}
+              className="glow-gold"
             >
+              <div
+                className="shimmer"
+                style={{ position: "absolute", inset: 0, borderRadius: 16 }}
+              />
+
               <div
                 className="sans"
                 style={{
@@ -395,17 +407,6 @@ export default function App() {
                 }}
               >
                 Contagem Regressiva
-              </div>
-
-              <div
-                className="sans"
-                style={{
-                  fontSize: 12,
-                  color: COLORS.muted,
-                  marginBottom: 12,
-                }}
-              >
-                Data provisória: {mockUser.eventMonthLabel}
               </div>
 
               <div
@@ -457,6 +458,18 @@ export default function App() {
                   </div>
                 ))}
               </div>
+
+              <div
+                className="sans"
+                style={{
+                  fontSize: 12,
+                  color: COLORS.muted,
+                  marginTop: 12,
+                  textAlign: "center",
+                }}
+              >
+                📍 Hotel Polana · Maputo · Sala Grandes Nomes
+              </div>
             </div>
 
             <div
@@ -484,7 +497,7 @@ export default function App() {
                   className="serif"
                   style={{ fontSize: 18, color: COLORS.gold, fontWeight: 700 }}
                 >
-                  {String(progress).padStart(2, "0")}%
+                  {mockUser.progress}%
                 </div>
               </div>
 
@@ -498,7 +511,7 @@ export default function App() {
               >
                 <div
                   style={{
-                    width: `${progress}%`,
+                    width: `${mockUser.progress}%`,
                     height: "100%",
                     background: `linear-gradient(90deg, ${COLORS.gold}, ${COLORS.goldLight})`,
                     borderRadius: 99,
@@ -511,7 +524,7 @@ export default function App() {
                 className="sans"
                 style={{ fontSize: 11, color: COLORS.muted, marginTop: 8 }}
               >
-                {completedModules} de {modules.length} módulos concluídos
+                2 de 4 módulos concluídos · continua assim 🔥
               </div>
             </div>
 
@@ -536,9 +549,26 @@ export default function App() {
                 marginBottom: 16,
               }}
             >
-              {displayedSpeakers.map((s, i) => (
+              {speakers.length === 0 && (
+                <div
+                  className="sans"
+                  style={{
+                    fontSize: 12,
+                    color: COLORS.muted,
+                    background: COLORS.card,
+                    border: `1px solid ${COLORS.border}`,
+                    borderRadius: 12,
+                    padding: 14,
+                  }}
+                >
+                  Ainda não há oradores cadastrados no Supabase.
+                </div>
+              )}
+
+              {speakers.map((s, i) => (
                 <div
                   key={s.id || i}
+                  className="card-hover"
                   style={{
                     background: COLORS.card,
                     border: `1px solid ${COLORS.border}`,
@@ -554,7 +584,9 @@ export default function App() {
                       width: 44,
                       height: 44,
                       borderRadius: "50%",
-                      background: `${s.color || COLORS.gold}22`,
+                      background: `linear-gradient(135deg, ${
+                        s.color || COLORS.gold
+                      }33, ${s.color || COLORS.gold}66)`,
                       border: `2px solid ${s.color || COLORS.gold}44`,
                       display: "flex",
                       alignItems: "center",
@@ -563,9 +595,10 @@ export default function App() {
                       fontWeight: 700,
                       fontSize: 13,
                       color: s.color || COLORS.gold,
+                      flexShrink: 0,
                     }}
                   >
-                    {s.avatar || "GG"}
+                    {s.avatar || "?"}
                   </div>
 
                   <div style={{ flex: 1 }}>
@@ -615,13 +648,16 @@ export default function App() {
             {modules.map((m) => (
               <div
                 key={m.id}
+                className="card-hover"
                 onClick={() =>
                   m.unlocked &&
                   setExpandedModule(expandedModule === m.id ? null : m.id)
                 }
                 style={{
                   background: m.unlocked ? COLORS.card : `${COLORS.card}88`,
-                  border: `1px solid ${COLORS.border}`,
+                  border: `1px solid ${
+                    m.unlocked ? COLORS.border : COLORS.border + "55"
+                  }`,
                   borderRadius: 14,
                   padding: 16,
                   marginBottom: 10,
@@ -630,14 +666,33 @@ export default function App() {
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <div style={{ fontSize: 24 }}>{m.icon}</div>
-                  <div>
+                  <div
+                    style={{
+                      width: 46,
+                      height: 46,
+                      borderRadius: 12,
+                      background: m.unlocked ? COLORS.goldGlow : COLORS.surface,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 22,
+                    }}
+                  >
+                    {m.icon}
+                  </div>
+
+                  <div style={{ flex: 1 }}>
                     <div
                       className="sans"
-                      style={{ fontSize: 14, fontWeight: 600 }}
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 600,
+                        color: m.unlocked ? COLORS.white : COLORS.muted,
+                      }}
                     >
                       {m.title}
                     </div>
+
                     <div
                       className="sans"
                       style={{ fontSize: 11, color: COLORS.muted }}
@@ -647,17 +702,20 @@ export default function App() {
                   </div>
                 </div>
 
-                {expandedModule === m.id && (
+                {m.unlocked && expandedModule === m.id && (
                   <div
-                    className="sans"
                     style={{
-                      marginTop: 12,
-                      paddingTop: 12,
+                      marginTop: 14,
+                      paddingTop: 14,
                       borderTop: `1px solid ${COLORS.border}`,
-                      fontSize: 13,
                     }}
                   >
-                    {m.teaser}
+                    <div
+                      className="sans"
+                      style={{ fontSize: 13, color: COLORS.white }}
+                    >
+                      {m.teaser}
+                    </div>
                   </div>
                 )}
               </div>
@@ -669,42 +727,55 @@ export default function App() {
           <div className="tab-content">
             <div style={{ padding: "20px 0 16px" }}>
               <div className="serif" style={{ fontSize: 22, fontWeight: 700 }}>
-                Comunidade
+                Comunidade <span style={{ color: COLORS.gold }}>✦</span>
               </div>
             </div>
 
-            <textarea
-              value={newMsg}
-              onChange={(e) => setNewMsg(e.target.value)}
-              placeholder="Partilha uma ideia, dúvida ou conquista..."
+            <div
               style={{
-                width: "100%",
                 background: COLORS.card,
                 border: `1px solid ${COLORS.border}`,
-                borderRadius: 8,
-                padding: 12,
-                color: COLORS.white,
-                fontFamily: "DM Sans",
-                fontSize: 13,
-                resize: "none",
-                height: 80,
-              }}
-            />
-
-            <button
-              onClick={sendMsg}
-              style={{
-                marginTop: 10,
-                background: COLORS.gold,
-                border: "none",
-                borderRadius: 8,
-                padding: "8px 18px",
-                fontWeight: 700,
-                color: COLORS.obsidian,
+                borderRadius: 14,
+                padding: 14,
+                marginBottom: 16,
               }}
             >
-              Publicar
-            </button>
+              <textarea
+                value={newMsg}
+                onChange={(e) => setNewMsg(e.target.value)}
+                placeholder="Partilha uma ideia, dúvida ou conquista..."
+                style={{
+                  width: "100%",
+                  background: "transparent",
+                  border: `1px solid ${COLORS.border}`,
+                  borderRadius: 8,
+                  padding: "10px 12px",
+                  color: COLORS.white,
+                  fontFamily: "DM Sans",
+                  fontSize: 13,
+                  resize: "none",
+                  height: 80,
+                }}
+              />
+
+              <button
+                onClick={sendMsg}
+                style={{
+                  marginTop: 10,
+                  background: `linear-gradient(135deg, ${COLORS.gold}, #8B6914)`,
+                  border: "none",
+                  borderRadius: 8,
+                  padding: "8px 18px",
+                  fontFamily: "DM Sans",
+                  fontWeight: 700,
+                  fontSize: 13,
+                  color: COLORS.obsidian,
+                  cursor: "pointer",
+                }}
+              >
+                Publicar
+              </button>
+            </div>
 
             {posts.map((p) => (
               <div
@@ -714,13 +785,16 @@ export default function App() {
                   border: `1px solid ${COLORS.border}`,
                   borderRadius: 14,
                   padding: 14,
-                  marginTop: 10,
+                  marginBottom: 10,
                 }}
               >
                 <div className="sans" style={{ fontSize: 13, fontWeight: 600 }}>
                   {p.avatar} · {p.user}
                 </div>
-                <div className="sans" style={{ fontSize: 13, marginTop: 8 }}>
+                <div
+                  className="sans"
+                  style={{ fontSize: 13, color: COLORS.white, marginTop: 8 }}
+                >
                   {p.msg}
                 </div>
               </div>
@@ -732,8 +806,43 @@ export default function App() {
           <div className="tab-content">
             <div style={{ padding: "20px 0 16px" }}>
               <div className="serif" style={{ fontSize: 22, fontWeight: 700 }}>
-                O Evento
+                O <span style={{ color: COLORS.gold }}>Evento</span>
               </div>
+            </div>
+
+            <div
+              style={{
+                background: COLORS.card,
+                border: `1px solid ${COLORS.border}`,
+                borderRadius: 14,
+                padding: 16,
+                marginBottom: 16,
+              }}
+            >
+              <div className="sans" style={{ fontSize: 14, fontWeight: 600 }}>
+                Hotel Polana — Sala Grandes Nomes
+              </div>
+              <div
+                className="sans"
+                style={{ fontSize: 12, color: COLORS.muted }}
+              >
+                Av. Julius Nyerere, Maputo
+              </div>
+              <a
+                href="https://maps.google.com/?q=Hotel+Polana+Maputo"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="sans"
+                style={{
+                  fontSize: 12,
+                  color: "#9B94FF",
+                  marginTop: 8,
+                  textDecoration: "none",
+                  display: "inline-block",
+                }}
+              >
+                Ver no mapa →
+              </a>
             </div>
 
             {agenda.map((a, i) => (
@@ -753,7 +862,10 @@ export default function App() {
                 >
                   {a.time}
                 </div>
-                <div className="sans" style={{ fontSize: 13 }}>
+                <div
+                  className="sans"
+                  style={{ fontSize: 13, color: COLORS.white }}
+                >
                   {a.title}
                 </div>
               </div>
@@ -761,6 +873,8 @@ export default function App() {
           </div>
         )}
       </div>
+
+      <div style={{ height: 20, background: COLORS.obsidian }} />
     </div>
   );
 }
