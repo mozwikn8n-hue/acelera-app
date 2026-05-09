@@ -22,8 +22,6 @@ const mockUser = {
   course: "Acelera – Carreira Com Propósito",
   edition: "4.0",
   eventMonthLabel: "Julho de 2026",
-  // Como o dia ainda não está definido, usamos 01 de Julho apenas como referência provisória.
-  // Quando tiveres a data oficial, altera apenas esta linha.
   eventDate: "2026-07-01T00:00:00+02:00",
   avatar: "",
 };
@@ -36,7 +34,6 @@ function getInitials(name) {
     .slice(0, 2)
     .toUpperCase();
 }
-const [modules, setModules] = useState([]);
 
 const community = [
   {
@@ -154,6 +151,7 @@ export default function App() {
   const [posts, setPosts] = useState(community);
   const [expandedModule, setExpandedModule] = useState(null);
 
+  // ✅ CORRIGIDO: useState declarados apenas uma vez, dentro do componente
   const [speakers, setSpeakers] = useState([]);
   const [modules, setModules] = useState([]);
 
