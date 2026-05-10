@@ -3,10 +3,15 @@ import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig({
+  server: {
+    allowedHosts: ["f49qyv-5173.csb.app"],
+  },
+
   plugins: [
     react(),
     VitePWA({
       registerType: "autoUpdate",
+
       manifest: {
         name: "Acelera - Carreira com Propósito",
         short_name: "Acelera",
@@ -17,6 +22,7 @@ export default defineConfig({
         start_url: "/",
         scope: "/",
         orientation: "portrait",
+
         icons: [
           {
             src: "/icon-192.png",
