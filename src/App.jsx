@@ -86,6 +86,49 @@ const TYPE_COLORS = {
   close: C.accent,
 };
 
+const REACTION_EMOJIS = ["❤️", "🔥", "👏", "😂", "💡"];
+
+function initials(name = "") {
+  return (
+    name
+      .trim()
+      .split(" ")
+      .filter(Boolean)
+      .map((n) => n[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() || "AC"
+  );
+}
+
+function formatTimeAgo(dateString) {
+  if (!dateString) return "agora";
+  const date = new Date(dateString);
+  const diff = Date.now() - date.getTime();
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  if (minutes < 1) return "agora";
+  if (minutes < 60) return `há ${minutes} min`;
+  if (hours < 24) return `há ${hours}h`;
+  if (days === 1) return "ontem";
+  if (days < 7) return `há ${days} dias`;
+
+  return date.toLocaleDateString("pt-PT", {
+    day: "2-digit",
+    month: "short",
+  });
+}
+
+function getProgressStage(progress) {
+  if (progress >= 100) return "Pronta para Escalar";
+  if (progress >= 75) return "Aceleradora";
+  if (progress >= 50) return "Estratégica";
+  if (progress >= 25) return "Em Movimento";
+  return "Exploradora";
+}
+
 // ─── Countdown hook ───────────────────────────────────────────────────────────
 function useCountdown(targetDate) {
   const [time, setTime] = useState({ d: 0, h: 0, m: 0, s: 0 });
@@ -113,6 +156,69 @@ function useCountdown(targetDate) {
 
 // ─── Skeleton ────────────────────────────────────────────────────────────────
 function Skeleton({ h = 60, radius = 12, mb = 10 }) {
+  return (
+    <div
+      style={{
+        height: h,
+        borderRadius: radius,
+        marginBottom: mb,
+        background: `linear-gradient(90deg, ${C.card} 25%, ${C.cardHover} 50%, ${C.card} 75%)`,
+        backgroundSize: "200% 100%",
+        animation: "skelShimmer 1.6s infinite",
+      }}
+    />
+  );
+}
+
+// ─── App ─────────────────────────────────────────────────────────────────────
+export default function App() {
+  const [tab, setTab] = useState("home");
+  const [liked, setLiked] = useState({});
+  const [newMsg, setNewMsg] = useState("");
+  const [posts, setPosts] = useState([]);
+  const [loadingCommunity, setLoadingCommunity] = useState(true);
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [reactionPickerFor, setReactionPickerFor] = useState(null);
+  const [expandedModule, setExpanded] = useState(null);
+
+  // Supabase data
+  const [modules, setModules] = useState([]);
+  const [loadingModules, setLoadMod] = useState(true);
+  const [eventInfo, setEventInfo] = useState(null);
+  const [agenda, setAgenda] = useState([]);
+  const [speakers, setSpeakers] = useState([]);
+  const [loadingEvent, setLoadEvent] = useState(true);
+
+  // Profile data
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [profile, setProfile] = useState(null);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [completedModuleIds, setCompletedModuleIds] = useState(new Set());
+
+  const countdown = useCountdown(eventInfo?.event_date || mockUser.eventDate);
+  const completedModules = completedModuleIds.size;
+  const progress =
+    modules.length > 0
+      ? Math.round((completedModules / modules.length) * 100)
+      : 0;
+  const progressStage = getProgressStage(progress);
+
+  const currentName = profile?.name || mockUser.name;
+  const currentEmail = profile?.email || mockUser.email;
+  const currentRole = profile?.role || "user";
+  const currentAvatar =
+    profile?.avatar ||
+    mockUser.avatar ||
+    currentName
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase();
+  const currentAvatarIsImage =
+    typeof currentAvatar === "string" && currentAvatar.startsWith("http");
+
   const ensureParticipantProfile = async () => {
     if (profile?.id) return profile;
 
@@ -129,7 +235,7 @@ function Skeleton({ h = 60, radius = 12, mb = 10 }) {
       .single();
 
     if (error) {
-      alert("Erro ao criar perfil para progresso: " + error.message);
+      alert("Erro ao criar perfil: " + error.message);
       return null;
     }
 
@@ -143,7 +249,6 @@ function Skeleton({ h = 60, radius = 12, mb = 10 }) {
     const participant = await ensureParticipantProfile();
     if (!participant?.id) return;
 
-    // Actualiza visualmente de imediato
     setCompletedModuleIds((prev) => {
       const next = new Set(prev);
       next.add(module.id);
@@ -186,64 +291,143 @@ function Skeleton({ h = 60, radius = 12, mb = 10 }) {
     setProfile((prev) => ({ ...prev, progress: nextProgress }));
   };
 
-  return (
-    <div
-      style={{
-        height: h,
-        borderRadius: radius,
-        marginBottom: mb,
-        background: `linear-gradient(90deg, ${C.card} 25%, ${C.cardHover} 50%, ${C.card} 75%)`,
-        backgroundSize: "200% 100%",
-        animation: "skelShimmer 1.6s infinite",
-      }}
-    />
-  );
-}
+  const fetchCommunityPosts = async () => {
+    setLoadingCommunity(true);
 
-// ─── App ─────────────────────────────────────────────────────────────────────
-export default function App() {
-  const [tab, setTab] = useState("home");
-  const [liked, setLiked] = useState({});
-  const [newMsg, setNewMsg] = useState("");
-  const [posts, setPosts] = useState(COMMUNITY_SEED);
-  const [expandedModule, setExpanded] = useState(null);
+    const { data: rawPosts, error: postsError } = await supabase
+      .from("community_posts")
+      .select("*")
+      .order("created_at", { ascending: false });
 
-  // Supabase data
-  const [modules, setModules] = useState([]);
-  const [loadingModules, setLoadMod] = useState(true);
-  const [eventInfo, setEventInfo] = useState(null);
-  const [agenda, setAgenda] = useState([]);
-  const [speakers, setSpeakers] = useState([]);
-  const [loadingEvent, setLoadEvent] = useState(true);
+    if (postsError) {
+      console.log("Erro community_posts:", postsError);
+      setPosts([]);
+      setLoadingCommunity(false);
+      return;
+    }
 
-  // Profile data
-  const [profileOpen, setProfileOpen] = useState(false);
-  const [profile, setProfile] = useState(null);
-  const [savingProfile, setSavingProfile] = useState(false);
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  const [completedModuleIds, setCompletedModuleIds] = useState(new Set());
+    const postList = rawPosts || [];
+    const postIds = postList.map((p) => p.id);
+    const replyIds = [
+      ...new Set(postList.map((p) => p.reply_to).filter(Boolean)),
+    ];
 
-  const countdown = useCountdown(eventInfo?.event_date || mockUser.eventDate);
-  const completedModules = completedModuleIds.size;
-  const progress =
-    modules.length > 0
-      ? Math.round((completedModules / modules.length) * 100)
-      : 0;
+    const [{ data: replyPosts }, { data: reactions }] = await Promise.all([
+      replyIds.length
+        ? supabase.from("community_posts").select("*").in("id", replyIds)
+        : Promise.resolve({ data: [] }),
+      postIds.length
+        ? supabase
+            .from("community_reactions")
+            .select("*")
+            .in("post_id", postIds)
+        : Promise.resolve({ data: [] }),
+    ]);
 
-  const currentName = profile?.name || mockUser.name;
-  const currentEmail = profile?.email || mockUser.email;
-  const currentRole = profile?.role || "user";
-  const currentAvatar =
-    profile?.avatar ||
-    mockUser.avatar ||
-    currentName
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .slice(0, 2)
-      .toUpperCase();
-  const currentAvatarIsImage =
-    typeof currentAvatar === "string" && currentAvatar.startsWith("http");
+    const participantIds = [
+      ...new Set(
+        [...postList, ...(replyPosts || [])]
+          .map((p) => p.participant_id)
+          .filter(Boolean)
+      ),
+    ];
+
+    const { data: participants } = participantIds.length
+      ? await supabase
+          .from("participants")
+          .select("id,name,email,avatar,role")
+          .in("id", participantIds)
+      : { data: [] };
+
+    const participantMap = new Map((participants || []).map((p) => [p.id, p]));
+    const replyMap = new Map((replyPosts || []).map((p) => [p.id, p]));
+    const reactionsByPost = new Map();
+
+    (reactions || []).forEach((reaction) => {
+      const list = reactionsByPost.get(reaction.post_id) || [];
+      list.push(reaction);
+      reactionsByPost.set(reaction.post_id, list);
+    });
+
+    const merged = postList.map((post) => {
+      const author = participantMap.get(post.participant_id) || {};
+      const postReactions = reactionsByPost.get(post.id) || [];
+      const summary = postReactions.reduce((acc, reaction) => {
+        acc[reaction.emoji] = (acc[reaction.emoji] || 0) + 1;
+        return acc;
+      }, {});
+      const myReaction = profile?.id
+        ? postReactions.find(
+            (reaction) => reaction.participant_id === profile.id
+          )
+        : null;
+      const repliedRaw = post.reply_to ? replyMap.get(post.reply_to) : null;
+      const repliedAuthor = repliedRaw
+        ? participantMap.get(repliedRaw.participant_id) || {}
+        : null;
+
+      return {
+        ...post,
+        author,
+        reactions: postReactions,
+        reactionSummary: summary,
+        myReaction,
+        repliedPost: repliedRaw
+          ? {
+              ...repliedRaw,
+              author: repliedAuthor,
+            }
+          : null,
+      };
+    });
+
+    setPosts(merged);
+    setLoadingCommunity(false);
+  };
+
+  const scrollToPost = (postId) => {
+    const el = document.getElementById(`post-${postId}`);
+    if (!el) {
+      alert("A mensagem original não está visível neste momento.");
+      return;
+    }
+
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.style.boxShadow = `0 0 0 2px ${C.gold}, 0 0 36px rgba(201,168,76,0.28)`;
+    setTimeout(() => {
+      el.style.boxShadow = "";
+    }, 1600);
+  };
+
+  const reactToPost = async (postId, emoji) => {
+    const participant = await ensureParticipantProfile();
+    if (!participant?.id) return;
+
+    const { data: existing } = await supabase
+      .from("community_reactions")
+      .select("id, emoji")
+      .eq("post_id", postId)
+      .eq("participant_id", participant.id)
+      .maybeSingle();
+
+    if (existing?.id && existing.emoji === emoji) {
+      await supabase.from("community_reactions").delete().eq("id", existing.id);
+    } else if (existing?.id) {
+      await supabase
+        .from("community_reactions")
+        .update({ emoji })
+        .eq("id", existing.id);
+    } else {
+      await supabase.from("community_reactions").insert({
+        post_id: postId,
+        participant_id: participant.id,
+        emoji,
+      });
+    }
+
+    setReactionPickerFor(null);
+    fetchCommunityPosts();
+  };
 
   // Fetch profile
   useEffect(() => {
@@ -287,6 +471,11 @@ export default function App() {
 
       if (error) console.log("Erro module_progress:", error);
     })();
+  }, [profile?.id]);
+
+  // Fetch community posts
+  useEffect(() => {
+    fetchCommunityPosts();
   }, [profile?.id]);
 
   // Fetch modules
@@ -360,28 +549,26 @@ export default function App() {
     );
   };
 
-  const sendMsg = () => {
+  const sendMsg = async () => {
     if (!newMsg.trim()) return;
-    setPosts((p) => [
-      {
-        id: Date.now(),
-        user: currentName.split(" ")[0] + " N.",
-        avatar: currentAvatarIsImage
-          ? currentName
-              .split(" ")
-              .map((n) => n[0])
-              .join("")
-              .slice(0, 2)
-              .toUpperCase()
-          : currentAvatar,
-        time: "agora",
-        msg: newMsg,
-        likes: 0,
-        color: C.gold,
-      },
-      ...p,
-    ]);
+
+    const participant = await ensureParticipantProfile();
+    if (!participant?.id) return;
+
+    const { error } = await supabase.from("community_posts").insert({
+      participant_id: participant.id,
+      message: newMsg.trim(),
+      reply_to: replyingTo?.id || null,
+    });
+
+    if (error) {
+      alert("Erro ao publicar: " + error.message);
+      return;
+    }
+
     setNewMsg("");
+    setReplyingTo(null);
+    fetchCommunityPosts();
   };
 
   const handlePhotoUpload = async (e) => {
@@ -521,6 +708,11 @@ export default function App() {
         .map-btn:active { transform: scale(0.97); }
 
         textarea:focus { border-color: rgba(201,168,76,0.45) !important; outline: none; }
+        input:focus { border-color: rgba(201,168,76,0.45) !important; outline: none; }
+        .community-post { transition: box-shadow 0.35s, transform 0.18s; }
+        .community-post:hover { transform: translateY(-1px); }
+        .emoji-pill { transition: all 0.18s; }
+        .emoji-pill:hover { transform: translateY(-2px) scale(1.05); }
       `}</style>
 
       {/* ── HEADER ─────────────────────────────────────────────────────────── */}
@@ -889,6 +1081,28 @@ export default function App() {
                     boxShadow: `0 0 8px ${C.gold}55`,
                   }}
                 />
+              </div>
+              <div
+                style={{
+                  marginTop: 14,
+                  background: "rgba(201,168,76,0.06)",
+                  border: `1px solid ${C.borderGold}`,
+                  borderRadius: 12,
+                  padding: "12px 14px",
+                }}
+              >
+                <div
+                  className="sans"
+                  style={{ fontSize: 10, color: C.muted, marginBottom: 4 }}
+                >
+                  Nível da jornada
+                </div>
+                <div
+                  className="dsp"
+                  style={{ fontSize: 24, color: C.gold, fontWeight: 700 }}
+                >
+                  {progressStage}
+                </div>
               </div>
               {progress < 100 && (
                 <div
@@ -1331,28 +1545,82 @@ export default function App() {
                 className="sans"
                 style={{ fontSize: 13, color: C.muted, marginTop: 4 }}
               >
-                {posts.length} participantes activos agora
+                {loadingCommunity
+                  ? "A carregar conversas..."
+                  : `${posts.length} mensagens da comunidade`}
               </div>
             </div>
 
             {/* Compose */}
             <div
               style={{
-                background: C.card,
-                border: `1px solid ${C.border}`,
-                borderRadius: 16,
+                background: `linear-gradient(135deg, ${C.card} 0%, ${C.cardHover} 100%)`,
+                border: `1px solid ${C.borderGold}`,
+                borderRadius: 18,
                 padding: 16,
                 marginBottom: 18,
+                boxShadow: "0 12px 48px rgba(201,168,76,0.06)",
               }}
             >
+              {replyingTo && (
+                <div
+                  style={{
+                    background: "rgba(201,168,76,0.08)",
+                    border: `1px solid ${C.borderGold}`,
+                    borderRadius: 12,
+                    padding: "10px 12px",
+                    marginBottom: 12,
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: 10,
+                  }}
+                >
+                  <div style={{ minWidth: 0 }}>
+                    <div
+                      className="sans"
+                      style={{ fontSize: 10, color: C.gold, fontWeight: 700 }}
+                    >
+                      A responder a {replyingTo.author?.name || "participante"}
+                    </div>
+                    <div
+                      className="sans"
+                      style={{
+                        fontSize: 12,
+                        color: C.offwhite,
+                        marginTop: 3,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {replyingTo.message}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setReplyingTo(null)}
+                    style={{
+                      border: "none",
+                      background: "transparent",
+                      color: C.muted,
+                      fontSize: 18,
+                      cursor: "pointer",
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
+
               <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
                 <div
                   style={{
-                    width: 36,
-                    height: 36,
+                    width: 38,
+                    height: 38,
                     borderRadius: "50%",
                     flexShrink: 0,
-                    background: `linear-gradient(135deg, ${C.gold}, ${C.goldDim})`,
+                    background: currentAvatarIsImage
+                      ? `url(${currentAvatar}) center/cover`
+                      : `linear-gradient(135deg, ${C.gold}, ${C.goldDim})`,
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -1362,30 +1630,27 @@ export default function App() {
                     color: C.obsidian,
                   }}
                 >
-                  {currentAvatarIsImage
-                    ? currentName
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("")
-                        .slice(0, 2)
-                        .toUpperCase()
-                    : currentAvatar}
+                  {!currentAvatarIsImage && currentAvatar}
                 </div>
                 <textarea
                   value={newMsg}
                   onChange={(e) => setNewMsg(e.target.value)}
-                  placeholder="Partilha uma ideia, dúvida ou conquista..."
+                  placeholder={
+                    replyingTo
+                      ? "Escreve a tua resposta..."
+                      : "Partilha uma ideia, dúvida ou conquista..."
+                  }
                   style={{
                     flex: 1,
                     background: "rgba(255,255,255,0.03)",
                     border: `1px solid ${C.border}`,
-                    borderRadius: 10,
-                    padding: "10px 12px",
+                    borderRadius: 12,
+                    padding: "11px 12px",
                     color: C.white,
                     fontFamily: "DM Sans",
                     fontSize: 13,
                     resize: "none",
-                    height: 78,
+                    height: 86,
                     transition: "border 0.2s",
                   }}
                 />
@@ -1395,131 +1660,352 @@ export default function App() {
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
+                  gap: 12,
                 }}
               >
                 <div className="sans" style={{ fontSize: 10, color: C.muted }}>
-                  Visível para todos os participantes
+                  Conversa visível para participantes do Acelera.
                 </div>
                 <button
                   onClick={sendMsg}
+                  disabled={!newMsg.trim()}
                   style={{
-                    background: `linear-gradient(135deg, ${C.gold}, ${C.goldDim})`,
+                    background: newMsg.trim()
+                      ? `linear-gradient(135deg, ${C.gold}, ${C.goldDim})`
+                      : "rgba(255,255,255,0.05)",
                     border: "none",
-                    borderRadius: 10,
-                    padding: "9px 20px",
+                    borderRadius: 12,
+                    padding: "10px 18px",
                     fontFamily: "DM Sans",
-                    fontWeight: 700,
+                    fontWeight: 800,
                     fontSize: 13,
-                    color: C.obsidian,
-                    cursor: "pointer",
+                    color: newMsg.trim() ? C.obsidian : C.muted,
+                    cursor: newMsg.trim() ? "pointer" : "not-allowed",
+                    whiteSpace: "nowrap",
                   }}
                 >
-                  Publicar
+                  {replyingTo ? "Responder" : "Publicar"}
                 </button>
               </div>
             </div>
 
+            {loadingCommunity && (
+              <>
+                <Skeleton h={120} mb={10} />
+                <Skeleton h={120} mb={10} />
+                <Skeleton h={120} mb={10} />
+              </>
+            )}
+
+            {!loadingCommunity && posts.length === 0 && (
+              <div
+                style={{
+                  background: C.card,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 18,
+                  padding: 22,
+                  textAlign: "center",
+                }}
+              >
+                <div className="dsp" style={{ fontSize: 24, color: C.gold }}>
+                  Ainda está silencioso por aqui.
+                </div>
+                <div
+                  className="sans"
+                  style={{ fontSize: 13, color: C.muted, marginTop: 6 }}
+                >
+                  Sê a primeira pessoa a partilhar uma ideia com a comunidade.
+                </div>
+              </div>
+            )}
+
             {/* Posts */}
             <div className="stagger">
-              {posts.map((p) => (
-                <div
-                  key={p.id}
-                  style={{
-                    background: C.card,
-                    border: `1px solid ${C.border}`,
-                    borderRadius: 16,
-                    padding: 16,
-                    marginBottom: 10,
-                  }}
-                >
-                  <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
-                    <div
-                      style={{
-                        width: 38,
-                        height: 38,
-                        borderRadius: "50%",
-                        flexShrink: 0,
-                        background: `${p.color}16`,
-                        border: `1px solid ${p.color}30`,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontFamily: "DM Sans",
-                        fontWeight: 700,
-                        fontSize: 12,
-                        color: p.color,
-                      }}
-                    >
-                      {p.avatar}
-                    </div>
-                    <div>
-                      <div
-                        className="sans"
-                        style={{
-                          fontSize: 13,
-                          fontWeight: 600,
-                          color: C.white,
-                        }}
-                      >
-                        {p.user}
-                      </div>
-                      <div
-                        className="sans"
-                        style={{ fontSize: 10, color: C.muted }}
-                      >
-                        {p.time}
-                      </div>
-                    </div>
-                  </div>
+              {posts.map((p) => {
+                const authorName = p.author?.name || "Participante";
+                const avatarValue = p.author?.avatar || initials(authorName);
+                const avatarIsImage =
+                  typeof avatarValue === "string" &&
+                  avatarValue.startsWith("http");
+
+                return (
                   <div
-                    className="sans"
+                    id={`post-${p.id}`}
+                    key={p.id}
+                    className="community-post"
                     style={{
-                      fontSize: 13,
-                      color: C.offwhite,
-                      lineHeight: 1.65,
+                      background: `linear-gradient(135deg, ${C.card} 0%, ${C.deep} 100%)`,
+                      border: `1px solid ${C.border}`,
+                      borderRadius: 18,
+                      padding: 16,
+                      marginBottom: 12,
+                      scrollMarginTop: 130,
                     }}
                   >
-                    {p.msg}
-                  </div>
-                  <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-                    <button
-                      onClick={() => toggleLike(p.id)}
+                    <div style={{ display: "flex", gap: 11, marginBottom: 12 }}>
+                      <div
+                        style={{
+                          width: 42,
+                          height: 42,
+                          borderRadius: "50%",
+                          flexShrink: 0,
+                          background: avatarIsImage
+                            ? `url(${avatarValue}) center/cover`
+                            : C.goldGlow,
+                          border: `1px solid ${C.borderGold}`,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontFamily: "DM Sans",
+                          fontWeight: 800,
+                          fontSize: 12,
+                          color: C.gold,
+                        }}
+                      >
+                        {!avatarIsImage && avatarValue}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "flex-start",
+                            gap: 10,
+                          }}
+                        >
+                          <div>
+                            <div
+                              className="sans"
+                              style={{
+                                fontSize: 13,
+                                fontWeight: 700,
+                                color: C.white,
+                              }}
+                            >
+                              {authorName}
+                            </div>
+                            <div
+                              className="sans"
+                              style={{
+                                fontSize: 10,
+                                color: C.muted,
+                                marginTop: 2,
+                              }}
+                            >
+                              {formatTimeAgo(p.created_at)}
+                            </div>
+                          </div>
+                          {p.author?.role === "admin" && (
+                            <span
+                              className="sans"
+                              style={{
+                                border: `1px solid ${C.borderGold}`,
+                                color: C.gold,
+                                borderRadius: 999,
+                                padding: "4px 8px",
+                                fontSize: 9,
+                                fontWeight: 800,
+                                background: C.goldGlow,
+                                textTransform: "uppercase",
+                              }}
+                            >
+                              admin
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {p.repliedPost && (
+                      <button
+                        onClick={() => scrollToPost(p.repliedPost.id)}
+                        style={{
+                          width: "100%",
+                          textAlign: "left",
+                          background: "rgba(201,168,76,0.07)",
+                          border: `1px solid ${C.borderGold}`,
+                          borderRadius: 12,
+                          padding: "9px 11px",
+                          marginBottom: 12,
+                          cursor: "pointer",
+                        }}
+                      >
+                        <div
+                          className="sans"
+                          style={{
+                            fontSize: 10,
+                            color: C.gold,
+                            fontWeight: 800,
+                          }}
+                        >
+                          Em resposta a{" "}
+                          {p.repliedPost.author?.name || "participante"}
+                        </div>
+                        <div
+                          className="sans"
+                          style={{
+                            fontSize: 12,
+                            color: C.offwhite,
+                            marginTop: 3,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {p.repliedPost.message}
+                        </div>
+                      </button>
+                    )}
+
+                    <div
+                      className="sans"
                       style={{
-                        background: liked[p.id] ? C.goldGlow2 : "transparent",
-                        border: `1px solid ${
-                          liked[p.id] ? C.borderGold : C.border
-                        }`,
-                        borderRadius: 20,
-                        padding: "5px 14px",
-                        cursor: "pointer",
+                        fontSize: 13,
+                        color: C.offwhite,
+                        lineHeight: 1.7,
+                        whiteSpace: "pre-wrap",
+                      }}
+                    >
+                      {p.message}
+                    </div>
+
+                    {Object.keys(p.reactionSummary || {}).length > 0 && (
+                      <div
+                        style={{
+                          display: "flex",
+                          flexWrap: "wrap",
+                          gap: 6,
+                          marginTop: 12,
+                        }}
+                      >
+                        {Object.entries(p.reactionSummary).map(
+                          ([emoji, count]) => (
+                            <button
+                              key={emoji}
+                              className="emoji-pill"
+                              onClick={() => reactToPost(p.id, emoji)}
+                              style={{
+                                border: `1px solid ${
+                                  p.myReaction?.emoji === emoji
+                                    ? C.borderGold
+                                    : C.border
+                                }`,
+                                background:
+                                  p.myReaction?.emoji === emoji
+                                    ? C.goldGlow
+                                    : "rgba(255,255,255,0.03)",
+                                color: C.offwhite,
+                                borderRadius: 999,
+                                padding: "5px 9px",
+                                cursor: "pointer",
+                                fontFamily: "DM Sans",
+                                fontSize: 12,
+                              }}
+                            >
+                              {emoji} {count}
+                            </button>
+                          )
+                        )}
+                      </div>
+                    )}
+
+                    <div
+                      style={{
                         display: "flex",
-                        alignItems: "center",
-                        gap: 5,
-                        color: liked[p.id] ? C.gold : C.muted,
-                        fontFamily: "DM Sans",
-                        fontSize: 12,
-                        transition: "all 0.2s",
+                        gap: 8,
+                        marginTop: 13,
+                        position: "relative",
                       }}
                     >
-                      {liked[p.id] ? "♥" : "♡"} {p.likes}
-                    </button>
-                    <button
-                      style={{
-                        background: "transparent",
-                        border: `1px solid ${C.border}`,
-                        borderRadius: 20,
-                        padding: "5px 14px",
-                        cursor: "pointer",
-                        color: C.muted,
-                        fontFamily: "DM Sans",
-                        fontSize: 12,
-                      }}
-                    >
-                      Responder
-                    </button>
+                      <button
+                        onClick={() =>
+                          setReactionPickerFor(
+                            reactionPickerFor === p.id ? null : p.id
+                          )
+                        }
+                        style={{
+                          background: p.myReaction
+                            ? C.goldGlow2
+                            : "transparent",
+                          border: `1px solid ${
+                            p.myReaction ? C.borderGold : C.border
+                          }`,
+                          borderRadius: 20,
+                          padding: "6px 13px",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 5,
+                          color: p.myReaction ? C.gold : C.muted,
+                          fontFamily: "DM Sans",
+                          fontSize: 12,
+                        }}
+                      >
+                        {p.myReaction?.emoji || "♡"} Reagir
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setReplyingTo(p);
+                          window.scrollTo({ top: 0, behavior: "smooth" });
+                        }}
+                        style={{
+                          background: "transparent",
+                          border: `1px solid ${C.border}`,
+                          borderRadius: 20,
+                          padding: "6px 13px",
+                          cursor: "pointer",
+                          color: C.muted,
+                          fontFamily: "DM Sans",
+                          fontSize: 12,
+                        }}
+                      >
+                        Responder
+                      </button>
+
+                      {reactionPickerFor === p.id && (
+                        <div
+                          style={{
+                            position: "absolute",
+                            left: 0,
+                            bottom: 38,
+                            background: C.cardHover,
+                            border: `1px solid ${C.borderGold}`,
+                            borderRadius: 999,
+                            padding: "8px 10px",
+                            display: "flex",
+                            gap: 8,
+                            boxShadow: "0 14px 50px rgba(0,0,0,0.45)",
+                            zIndex: 30,
+                          }}
+                        >
+                          {REACTION_EMOJIS.map((emoji) => (
+                            <button
+                              key={emoji}
+                              className="emoji-pill"
+                              onClick={() => reactToPost(p.id, emoji)}
+                              style={{
+                                width: 32,
+                                height: 32,
+                                borderRadius: "50%",
+                                border: "none",
+                                background:
+                                  p.myReaction?.emoji === emoji
+                                    ? C.goldGlow
+                                    : "rgba(255,255,255,0.04)",
+                                cursor: "pointer",
+                                fontSize: 17,
+                              }}
+                            >
+                              {emoji}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
