@@ -142,7 +142,7 @@ export default function App() {
   const [speakers, setSpeakers] = useState([]);
   const [loadingEvent, setLoadEvent] = useState(true);
 
-  const countdown = useCountdown(mockUser.eventDate);
+  const countdown = useCountdown(eventInfo?.event_date || mockUser.eventDate);
   const completedModules = modules.filter((m) => m.completed).length;
   const progress =
     modules.length > 0
@@ -163,34 +163,46 @@ export default function App() {
   }, []);
 
   // Fetch event data
-  // Tabelas Supabase necessárias:
-  //   event_info  → venue_name, address, map_url, date_label, description
-  //   agenda      → time, title, type, sort_order
-  //   speakers    → name, role, topic, avatar, color, sort_order
+  // Tabelas Supabase usadas:
+  //   event_info  → title, venue, address, maps_link, event_month, event_date, description, active
+  //   agenda      → time, title, type, active, position
+  //   speakers    → name, role, topic, avatar, color
   useEffect(() => {
     (async () => {
       setLoadEvent(true);
+
       const [evRes, agRes, spRes] = await Promise.all([
-        supabase.from("event_info").select("*").single(),
+        supabase
+          .from("event_info")
+          .select("*")
+          .eq("active", true)
+          .limit(1)
+          .maybeSingle(),
+
         supabase
           .from("agenda")
           .select("*")
-          .order("sort_order", { ascending: true }),
-        supabase
-          .from("speakers")
-          .select("*")
-          .order("sort_order", { ascending: true }),
+          .eq("active", true)
+          .order("position", { ascending: true }),
+
+        supabase.from("speakers").select("*").order("id", { ascending: true }),
       ]);
+
       if (!evRes.error && evRes.data) setEventInfo(evRes.data);
       if (!agRes.error && agRes.data) setAgenda(agRes.data);
       if (!spRes.error && spRes.data) setSpeakers(spRes.data);
+
+      if (evRes.error) console.log("Erro event_info:", evRes.error);
+      if (agRes.error) console.log("Erro agenda:", agRes.error);
+      if (spRes.error) console.log("Erro speakers:", spRes.error);
+
       setLoadEvent(false);
     })();
   }, []);
 
-  // Map URL — usa map_url do Supabase ou faz fallback pelo endereço
+  // Map URL — usa maps_link do Supabase ou faz fallback pelo endereço
   const mapUrl =
-    eventInfo?.map_url ||
+    eventInfo?.maps_link ||
     (eventInfo?.address
       ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
           eventInfo.address
@@ -500,7 +512,7 @@ export default function App() {
                         fontStyle: "italic",
                       }}
                     >
-                      {mockUser.eventMonthLabel}
+                      {eventInfo?.event_month || mockUser.eventMonthLabel}
                     </div>
                   </div>
                   <div
@@ -1273,9 +1285,9 @@ export default function App() {
 
         {/* ══════════════════ EVENT ═════════════════════════════════════════
             Tabelas Supabase:
-              event_info  → venue_name, address, map_url, date_label, description
-              agenda      → time, title, type, sort_order
-              speakers    → name, role, topic, avatar, color, sort_order
+              event_info  → title, venue, address, maps_link, event_month, event_date, description, active
+              agenda      → time, title, type, active, position
+              speakers    → name, role, topic, avatar, color
         ═══════════════════════════════════════════════════════════════════ */}
         {tab === "event" && (
           <div className="tab-in">
@@ -1348,7 +1360,7 @@ export default function App() {
                           lineHeight: 1.3,
                         }}
                       >
-                        {eventInfo?.venue_name ||
+                        {eventInfo?.venue ||
                           "Hotel Polana — Sala Grandes Nomes"}
                       </div>
                       <div
@@ -1357,12 +1369,16 @@ export default function App() {
                       >
                         {eventInfo?.address || "Av. Julius Nyerere, Maputo"}
                       </div>
-                      {eventInfo?.date_label && (
+                      {(eventInfo?.event_month || eventInfo?.event_date) && (
                         <div
                           className="sans"
                           style={{ fontSize: 11, color: C.gold, marginTop: 6 }}
                         >
-                          📅 {eventInfo.date_label}
+                          📅{" "}
+                          {eventInfo?.event_month ||
+                            new Date(eventInfo.event_date).toLocaleDateString(
+                              "pt-PT"
+                            )}
                         </div>
                       )}
                     </div>
