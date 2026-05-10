@@ -28,6 +28,7 @@ const LOGO_URL =
 
 const mockUser = {
   name: "Dádiva Gulele",
+  email: "dad.gulele@gmail.com",
   course: "Acelera – Carreira Com Propósito",
   edition: "4.0",
   eventDate: "2026-07-01T00:00:00+02:00",
@@ -142,12 +143,58 @@ export default function App() {
   const [speakers, setSpeakers] = useState([]);
   const [loadingEvent, setLoadEvent] = useState(true);
 
+  // Profile data
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [profile, setProfile] = useState(null);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
   const countdown = useCountdown(eventInfo?.event_date || mockUser.eventDate);
   const completedModules = modules.filter((m) => m.completed).length;
   const progress =
     modules.length > 0
       ? Math.round((completedModules / modules.length) * 100)
       : 0;
+
+  const currentName = profile?.name || mockUser.name;
+  const currentEmail = profile?.email || mockUser.email;
+  const currentRole = profile?.role || "user";
+  const currentAvatar =
+    profile?.avatar ||
+    mockUser.avatar ||
+    currentName
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase();
+  const currentAvatarIsImage =
+    typeof currentAvatar === "string" && currentAvatar.startsWith("http");
+
+  // Fetch profile
+  useEffect(() => {
+    (async () => {
+      const { data, error } = await supabase
+        .from("participants")
+        .select("*")
+        .eq("email", mockUser.email)
+        .maybeSingle();
+
+      if (!error && data) {
+        setProfile(data);
+      } else {
+        setProfile({
+          name: mockUser.name,
+          email: mockUser.email,
+          avatar: mockUser.avatar,
+          progress: 0,
+          role: "user",
+        });
+      }
+
+      if (error) console.log("Erro participants:", error);
+    })();
+  }, []);
 
   // Fetch modules
   useEffect(() => {
@@ -225,8 +272,15 @@ export default function App() {
     setPosts((p) => [
       {
         id: Date.now(),
-        user: mockUser.name.split(" ")[0] + " N.",
-        avatar: mockUser.avatar,
+        user: currentName.split(" ")[0] + " N.",
+        avatar: currentAvatarIsImage
+          ? currentName
+              .split(" ")
+              .map((n) => n[0])
+              .join("")
+              .slice(0, 2)
+              .toUpperCase()
+          : currentAvatar,
         time: "agora",
         msg: newMsg,
         likes: 0,
@@ -235,6 +289,82 @@ export default function App() {
       ...p,
     ]);
     setNewMsg("");
+  };
+
+  const handlePhotoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !profile) return;
+
+    setUploadingPhoto(true);
+
+    const fileExt = file.name.split(".").pop();
+    const safeEmail = currentEmail.replace(/[^a-zA-Z0-9]/g, "-");
+    const filePath = `${safeEmail}/${Date.now()}.${fileExt}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("profile-photos")
+      .upload(filePath, file, { upsert: true });
+
+    if (uploadError) {
+      alert("Erro ao carregar foto: " + uploadError.message);
+      setUploadingPhoto(false);
+      return;
+    }
+
+    const { data: publicData } = supabase.storage
+      .from("profile-photos")
+      .getPublicUrl(filePath);
+
+    const publicUrl = publicData?.publicUrl;
+
+    setProfile((prev) => ({ ...prev, avatar: publicUrl }));
+    setUploadingPhoto(false);
+  };
+
+  const saveProfile = async () => {
+    if (!profile?.name?.trim()) {
+      alert("O nome não pode ficar vazio.");
+      return;
+    }
+
+    setSavingProfile(true);
+
+    const payload = {
+      name: profile.name.trim(),
+      avatar: profile.avatar || null,
+    };
+
+    let result;
+
+    if (profile.id) {
+      result = await supabase
+        .from("participants")
+        .update(payload)
+        .eq("id", profile.id)
+        .select()
+        .single();
+    } else {
+      result = await supabase
+        .from("participants")
+        .insert({
+          ...payload,
+          email: currentEmail,
+          progress: profile.progress || 0,
+          role: profile.role || "user",
+        })
+        .select()
+        .single();
+    }
+
+    if (result.error) {
+      alert("Erro ao guardar perfil: " + result.error.message);
+      setSavingProfile(false);
+      return;
+    }
+
+    setProfile(result.data);
+    setSavingProfile(false);
+    setProfileOpen(false);
   };
 
   return (
@@ -361,14 +491,18 @@ export default function App() {
           </div>
 
           {/* Avatar */}
-          <div
+          <button
             className="pulse press"
+            onClick={() => setProfileOpen(true)}
             style={{
               width: 40,
               height: 40,
               borderRadius: "50%",
               flexShrink: 0,
-              background: `linear-gradient(135deg, ${C.gold}, ${C.goldDim})`,
+              background: currentAvatarIsImage
+                ? `url(${currentAvatar}) center/cover`
+                : `linear-gradient(135deg, ${C.gold}, ${C.goldDim})`,
+              border: "none",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -377,9 +511,10 @@ export default function App() {
               fontSize: 13,
               color: C.obsidian,
             }}
+            title="Abrir perfil"
           >
-            {mockUser.avatar}
-          </div>
+            {!currentAvatarIsImage && currentAvatar}
+          </button>
         </div>
 
         {/* Nav */}
@@ -445,7 +580,7 @@ export default function App() {
                   marginTop: 4,
                 }}
               >
-                {mockUser.name.split(" ")[0]}
+                {currentName.split(" ")[0]}
                 <span style={{ color: C.gold }}> ✦</span>
               </div>
               <div
@@ -1128,7 +1263,14 @@ export default function App() {
                     color: C.obsidian,
                   }}
                 >
-                  {mockUser.avatar}
+                  {currentAvatarIsImage
+                    ? currentName
+                        .split(" ")
+                        .map((n) => n[0])
+                        .join("")
+                        .slice(0, 2)
+                        .toUpperCase()
+                    : currentAvatar}
                 </div>
                 <textarea
                   value={newMsg}
@@ -1578,24 +1720,25 @@ export default function App() {
                             </div>
                             <div
                               style={{
-                                width: 12,
-                                height: 12,
+                                width: 16,
+                                height: 16,
                                 borderRadius: "50%",
-                                background: dotColor,
-                                border: `2px solid ${C.obsidian}`,
+                                background: `linear-gradient(135deg, ${dotColor}, ${C.white})`,
+                                border: `3px solid ${C.obsidian}`,
                                 flexShrink: 0,
-                                marginTop: 11,
+                                marginTop: 10,
                                 zIndex: 1,
-                                boxShadow: `0 0 8px ${dotColor}55`,
+                                boxShadow: `0 0 18px ${dotColor}`,
                               }}
                             />
                             <div
                               style={{
                                 flex: 1,
-                                background: C.card,
-                                border: `1px solid ${C.border}`,
-                                borderRadius: 12,
-                                padding: "10px 14px",
+                                background: `linear-gradient(135deg, ${C.card} 0%, ${C.cardHover} 100%)`,
+                                border: `1px solid ${dotColor}30`,
+                                borderRadius: 16,
+                                padding: "14px 16px",
+                                boxShadow: `0 0 22px ${dotColor}15`,
                               }}
                             >
                               <div
@@ -1710,6 +1853,310 @@ export default function App() {
           </div>
         )}
       </main>
+
+      {profileOpen && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.62)",
+            backdropFilter: "blur(10px)",
+            WebkitBackdropFilter: "blur(10px)",
+            zIndex: 999,
+            display: "flex",
+            alignItems: "flex-end",
+            justifyContent: "center",
+            padding: 18,
+          }}
+          onClick={() => setProfileOpen(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "100%",
+              maxWidth: 430,
+              background: `linear-gradient(180deg, ${C.cardHover} 0%, ${C.deep} 100%)`,
+              border: `1px solid ${C.borderGold}`,
+              borderRadius: 24,
+              padding: 22,
+              boxShadow: "0 20px 80px rgba(0,0,0,0.45)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 18,
+              }}
+            >
+              <div>
+                <div
+                  className="dsp"
+                  style={{ fontSize: 28, fontWeight: 700, color: C.white }}
+                >
+                  Meu Perfil
+                </div>
+                <div
+                  className="sans"
+                  style={{ fontSize: 12, color: C.muted, marginTop: 2 }}
+                >
+                  Actualiza apenas os teus dados.
+                </div>
+              </div>
+
+              <button
+                onClick={() => setProfileOpen(false)}
+                style={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: "50%",
+                  border: `1px solid ${C.border}`,
+                  background: "rgba(255,255,255,0.03)",
+                  color: C.offwhite,
+                  cursor: "pointer",
+                  fontSize: 18,
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 16,
+                marginBottom: 18,
+              }}
+            >
+              <div
+                style={{
+                  width: 76,
+                  height: 76,
+                  borderRadius: "50%",
+                  background: currentAvatarIsImage
+                    ? `url(${currentAvatar}) center/cover`
+                    : `linear-gradient(135deg, ${C.gold}, ${C.goldDim})`,
+                  border: `2px solid ${C.borderGold}`,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontFamily: "DM Sans",
+                  fontWeight: 800,
+                  fontSize: 20,
+                  color: C.obsidian,
+                  flexShrink: 0,
+                }}
+              >
+                {!currentAvatarIsImage && currentAvatar}
+              </div>
+
+              <div style={{ flex: 1 }}>
+                <label
+                  className="sans"
+                  style={{
+                    display: "inline-block",
+                    background: C.goldGlow,
+                    border: `1px solid ${C.borderGold}`,
+                    color: C.gold,
+                    borderRadius: 12,
+                    padding: "9px 12px",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  {uploadingPhoto ? "A carregar..." : "Alterar foto"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePhotoUpload}
+                    style={{ display: "none" }}
+                    disabled={uploadingPhoto}
+                  />
+                </label>
+                <div
+                  className="sans"
+                  style={{
+                    fontSize: 10,
+                    color: C.muted,
+                    marginTop: 8,
+                    lineHeight: 1.5,
+                  }}
+                >
+                  A foto será enviada para o Supabase Storage e o link ficará
+                  guardado no teu perfil.
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div>
+                <label
+                  className="sans"
+                  style={{
+                    fontSize: 11,
+                    color: C.muted,
+                    display: "block",
+                    marginBottom: 6,
+                  }}
+                >
+                  Nome
+                </label>
+                <input
+                  value={profile?.name || ""}
+                  onChange={(e) =>
+                    setProfile((prev) => ({ ...prev, name: e.target.value }))
+                  }
+                  style={{
+                    width: "100%",
+                    background: "rgba(255,255,255,0.035)",
+                    border: `1px solid ${C.border}`,
+                    borderRadius: 12,
+                    padding: "13px 14px",
+                    color: C.white,
+                    fontFamily: "DM Sans",
+                    fontSize: 14,
+                    outline: "none",
+                  }}
+                />
+              </div>
+
+              <div>
+                <label
+                  className="sans"
+                  style={{
+                    fontSize: 11,
+                    color: C.muted,
+                    display: "block",
+                    marginBottom: 6,
+                  }}
+                >
+                  Email
+                </label>
+                <div
+                  className="sans"
+                  style={{
+                    background: "rgba(255,255,255,0.02)",
+                    border: `1px solid ${C.border}`,
+                    borderRadius: 12,
+                    padding: "13px 14px",
+                    color: C.muted,
+                    fontSize: 13,
+                  }}
+                >
+                  {currentEmail}
+                </div>
+              </div>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: 10,
+                }}
+              >
+                <div
+                  style={{
+                    background: "rgba(255,255,255,0.02)",
+                    border: `1px solid ${C.border}`,
+                    borderRadius: 12,
+                    padding: 13,
+                  }}
+                >
+                  <div
+                    className="sans"
+                    style={{ fontSize: 10, color: C.muted, marginBottom: 5 }}
+                  >
+                    Progresso
+                  </div>
+                  <div
+                    className="dsp"
+                    style={{ fontSize: 26, color: C.gold, lineHeight: 1 }}
+                  >
+                    {profile?.progress ?? progress}%
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    background: "rgba(255,255,255,0.02)",
+                    border: `1px solid ${C.border}`,
+                    borderRadius: 12,
+                    padding: 13,
+                  }}
+                >
+                  <div
+                    className="sans"
+                    style={{ fontSize: 10, color: C.muted, marginBottom: 7 }}
+                  >
+                    Permissão
+                  </div>
+                  <span
+                    className="sans"
+                    style={{
+                      display: "inline-block",
+                      borderRadius: 999,
+                      padding: "5px 10px",
+                      background:
+                        currentRole === "admin"
+                          ? C.goldGlow
+                          : "rgba(255,255,255,0.035)",
+                      border: `1px solid ${
+                        currentRole === "admin" ? C.borderGold : C.border
+                      }`,
+                      color: currentRole === "admin" ? C.gold : C.muted,
+                      fontSize: 11,
+                      fontWeight: 700,
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    {currentRole}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={saveProfile}
+              disabled={savingProfile || uploadingPhoto}
+              style={{
+                width: "100%",
+                marginTop: 18,
+                background: `linear-gradient(135deg, ${C.gold}, ${C.goldDim})`,
+                border: "none",
+                borderRadius: 14,
+                padding: "14px",
+                fontFamily: "DM Sans",
+                fontWeight: 800,
+                fontSize: 14,
+                color: C.obsidian,
+                cursor:
+                  savingProfile || uploadingPhoto ? "not-allowed" : "pointer",
+                opacity: savingProfile || uploadingPhoto ? 0.7 : 1,
+              }}
+            >
+              {savingProfile ? "A guardar..." : "Guardar alterações"}
+            </button>
+
+            {currentRole === "admin" && (
+              <div
+                className="sans"
+                style={{
+                  fontSize: 11,
+                  color: C.gold,
+                  marginTop: 12,
+                  textAlign: "center",
+                }}
+              >
+                Modo administrador activo. A gestão de outros perfis será
+                adicionada numa próxima etapa.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Bottom fade */}
       <div
