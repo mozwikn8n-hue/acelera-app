@@ -1,20 +1,26 @@
 import { useState, useEffect } from "react";
 import { supabase } from "./supabaseClient";
 
-const COLORS = {
-  obsidian: "#0A0A0F",
-  deep: "#0F0F1A",
-  surface: "#16162A",
-  card: "#1C1C32",
-  border: "#2A2A4A",
+// ─── Design Tokens ───────────────────────────────────────────────────────────
+const C = {
+  obsidian: "#07070E",
+  deep: "#0D0D1A",
+  card: "#141424",
+  cardHover: "#1A1A30",
+  border: "#22223A",
+  borderGold: "rgba(201,168,76,0.25)",
   gold: "#C9A84C",
   goldLight: "#E8C97A",
-  goldGlow: "rgba(201,168,76,0.15)",
-  white: "#F5F0E8",
-  muted: "#8888AA",
-  accent: "#6C63FF",
-  accentGlow: "rgba(108,99,255,0.2)",
-  success: "#4CAF8C",
+  goldDim: "#8B6914",
+  goldGlow: "rgba(201,168,76,0.12)",
+  goldGlow2: "rgba(201,168,76,0.06)",
+  white: "#F2EDE4",
+  offwhite: "#C8C2B8",
+  muted: "#6A6A88",
+  accent: "#5D56E8",
+  accentGlow: "rgba(93,86,232,0.18)",
+  success: "#3D9E76",
+  danger: "#E8637A",
 };
 
 const LOGO_URL =
@@ -29,7 +35,7 @@ const mockUser = {
   avatar: "DG",
 };
 
-const community = [
+const COMMUNITY_SEED = [
   {
     id: 1,
     user: "Carlos M.",
@@ -37,7 +43,7 @@ const community = [
     time: "há 2h",
     msg: "Já apliquei a técnica do módulo 1 no meu negócio. Resultados em 3 dias! 🔥",
     likes: 14,
-    color: "#C9A84C",
+    color: C.gold,
   },
   {
     id: 2,
@@ -46,16 +52,16 @@ const community = [
     time: "há 4h",
     msg: "Alguém mais de Maputo que precisa de carona para o evento? Vamos organizar 😊",
     likes: 7,
-    color: "#6C63FF",
+    color: C.accent,
   },
   {
     id: 3,
     user: "Jorge A.",
     avatar: "JA",
     time: "há 6h",
-    msg: "Dúvida: o certificado é enviado por email depois? Perguntei no suporte mas ainda aguardo.",
+    msg: "Dúvida: o certificado é enviado por email depois? Ainda aguardo resposta do suporte.",
     likes: 2,
-    color: "#4CAF8C",
+    color: C.success,
   },
   {
     id: 4,
@@ -64,62 +70,32 @@ const community = [
     time: "ontem",
     msg: "Módulo 2 mudou a forma como vejo o meu salão. Finalmente entendo o que me diferencia! 💅✨",
     likes: 21,
-    color: "#E8637A",
+    color: C.danger,
   },
 ];
 
-const speakers = [
-  {
-    name: "Glayds Gand",
-    role: "Mentora · Acelera 4.0",
-    topic: "Carreira com Propósito",
-    avatar: "GG",
-    color: "#C9A84C",
-  },
-];
-
-const agenda = [
-  { time: "08:30", title: "Chegada & Networking", type: "network" },
-  { time: "09:00", title: "Abertura — A Visão do Programa", type: "keynote" },
-  {
-    time: "10:00",
-    title: "Sessão: Autoconhecimento & Carreira",
-    type: "panel",
-  },
-  { time: "11:30", title: "Pausa Café & Conexões", type: "break" },
-  { time: "12:00", title: "Workshop: Plano de Carreira", type: "workshop" },
-  { time: "14:00", title: "Almoço Executivo", type: "break" },
-  { time: "15:30", title: "Liderança — Efeito Multiplicador", type: "case" },
-  { time: "17:00", title: "Sessão Q&A + Próximos Passos", type: "qa" },
-  { time: "18:00", title: "Networking Final & Encerramento", type: "close" },
-];
-
-const typeColors = {
-  keynote: "#C9A84C",
-  panel: "#6C63FF",
-  workshop: "#4CAF8C",
-  network: "#E8637A",
-  break: "#8888AA",
+const TYPE_COLORS = {
+  keynote: C.gold,
+  panel: C.accent,
+  workshop: C.success,
+  network: C.danger,
+  break: C.muted,
   case: "#FF9F43",
-  qa: "#C9A84C",
-  close: "#6C63FF",
+  qa: C.gold,
+  close: C.accent,
 };
 
+// ─── Countdown hook ───────────────────────────────────────────────────────────
 function useCountdown(targetDate) {
   const [time, setTime] = useState({ d: 0, h: 0, m: 0, s: 0 });
-
   useEffect(() => {
     const target = new Date(targetDate);
-
     const tick = () => {
-      const now = new Date();
-      const diff = target - now;
-
+      const diff = target - new Date();
       if (diff <= 0) {
         setTime({ d: 0, h: 0, m: 0, s: 0 });
         return;
       }
-
       setTime({
         d: Math.floor(diff / 86400000),
         h: Math.floor((diff % 86400000) / 3600000),
@@ -127,54 +103,99 @@ function useCountdown(targetDate) {
         s: Math.floor((diff % 60000) / 1000),
       });
     };
-
     tick();
-    const i = setInterval(tick, 1000);
-    return () => clearInterval(i);
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
   }, [targetDate]);
-
   return time;
 }
 
+// ─── Skeleton ────────────────────────────────────────────────────────────────
+function Skeleton({ h = 60, radius = 12, mb = 10 }) {
+  return (
+    <div
+      style={{
+        height: h,
+        borderRadius: radius,
+        marginBottom: mb,
+        background: `linear-gradient(90deg, ${C.card} 25%, ${C.cardHover} 50%, ${C.card} 75%)`,
+        backgroundSize: "200% 100%",
+        animation: "skelShimmer 1.6s infinite",
+      }}
+    />
+  );
+}
+
+// ─── App ─────────────────────────────────────────────────────────────────────
 export default function App() {
   const [tab, setTab] = useState("home");
   const [liked, setLiked] = useState({});
   const [newMsg, setNewMsg] = useState("");
-  const [posts, setPosts] = useState(community);
-  const [expandedModule, setExpandedModule] = useState(null);
+  const [posts, setPosts] = useState(COMMUNITY_SEED);
+  const [expandedModule, setExpanded] = useState(null);
+
+  // Supabase data
   const [modules, setModules] = useState([]);
-  const [loadingModules, setLoadingModules] = useState(true);
+  const [loadingModules, setLoadMod] = useState(true);
+  const [eventInfo, setEventInfo] = useState(null);
+  const [agenda, setAgenda] = useState([]);
+  const [speakers, setSpeakers] = useState([]);
+  const [loadingEvent, setLoadEvent] = useState(true);
 
   const countdown = useCountdown(mockUser.eventDate);
-
   const completedModules = modules.filter((m) => m.completed).length;
   const progress =
     modules.length > 0
       ? Math.round((completedModules / modules.length) * 100)
       : 0;
 
+  // Fetch modules
   useEffect(() => {
-    async function fetchModules() {
-      setLoadingModules(true);
-
+    (async () => {
+      setLoadMod(true);
       const { data, error } = await supabase
         .from("modules")
         .select("*")
         .order("id", { ascending: true });
-
-      if (error) {
-        console.error("Erro ao buscar módulos:", error);
-        setModules([]);
-        setLoadingModules(false);
-        return;
-      }
-
-      setModules(data || []);
-      setLoadingModules(false);
-    }
-
-    fetchModules();
+      if (!error) setModules(data || []);
+      setLoadMod(false);
+    })();
   }, []);
+
+  // Fetch event data
+  // Tabelas Supabase necessárias:
+  //   event_info  → venue_name, address, map_url, date_label, description
+  //   agenda      → time, title, type, sort_order
+  //   speakers    → name, role, topic, avatar, color, sort_order
+  useEffect(() => {
+    (async () => {
+      setLoadEvent(true);
+      const [evRes, agRes, spRes] = await Promise.all([
+        supabase.from("event_info").select("*").single(),
+        supabase
+          .from("agenda")
+          .select("*")
+          .order("sort_order", { ascending: true }),
+        supabase
+          .from("speakers")
+          .select("*")
+          .order("sort_order", { ascending: true }),
+      ]);
+      if (!evRes.error && evRes.data) setEventInfo(evRes.data);
+      if (!agRes.error && agRes.data) setAgenda(agRes.data);
+      if (!spRes.error && spRes.data) setSpeakers(spRes.data);
+      setLoadEvent(false);
+    })();
+  }, []);
+
+  // Map URL — usa map_url do Supabase ou faz fallback pelo endereço
+  const mapUrl =
+    eventInfo?.map_url ||
+    (eventInfo?.address
+      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+          eventInfo.address
+        )}`
+      : `https://www.google.com/maps/search/?api=1&query=Hotel+Polana+Maputo`);
 
   const toggleLike = (id) => {
     setLiked((p) => ({ ...p, [id]: !p[id] }));
@@ -197,7 +218,7 @@ export default function App() {
         time: "agora",
         msg: newMsg,
         likes: 0,
-        color: "#C9A84C",
+        color: C.gold,
       },
       ...p,
     ]);
@@ -207,117 +228,142 @@ export default function App() {
   return (
     <div
       style={{
-        fontFamily: "'Georgia', serif",
-        background: COLORS.obsidian,
+        fontFamily: "Georgia, serif",
+        background: C.obsidian,
         minHeight: "100vh",
-        color: COLORS.white,
+        color: C.white,
         maxWidth: 430,
         margin: "0 auto",
         position: "relative",
-        overflow: "hidden",
       }}
     >
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Sans:wght@300;400;500&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=DM+Sans:wght@300;400;500;600&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background: #0A0A0F; }
-        .serif { font-family: 'Playfair Display', Georgia, serif; }
+        body { background: #07070E; }
+        .dsp { font-family: 'Cormorant Garamond', Georgia, serif; }
         .sans { font-family: 'DM Sans', sans-serif; }
         ::-webkit-scrollbar { width: 0; }
-        .tab-content { animation: fadeUp 0.35s ease; }
-        @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
-        .pulse-ring { animation: pulseRing 2s ease-in-out infinite; }
-        @keyframes pulseRing { 0%,100%{box-shadow:0 0 0 0 rgba(201,168,76,0.4);} 50%{box-shadow:0 0 0 12px rgba(201,168,76,0);} }
-        .shimmer { background: linear-gradient(90deg, transparent 0%, rgba(201,168,76,0.08) 50%, transparent 100%); background-size: 200% 100%; animation: shimmer 2.5s infinite; }
-        @keyframes shimmer { 0%{background-position:200% 0;} 100%{background-position:-200% 0;} }
-        .card-hover { transition: transform 0.2s, box-shadow 0.2s; }
-        .card-hover:active { transform: scale(0.98); }
-        .glow-gold { box-shadow: 0 0 20px rgba(201,168,76,0.2); }
-        input, textarea { outline: none; }
-        textarea:focus { border-color: rgba(201,168,76,0.5) !important; }
+
+        .tab-in { animation: tabIn 0.4s cubic-bezier(0.22,1,0.36,1); }
+        @keyframes tabIn { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+
+        .stagger > * { opacity:0; animation: tabIn 0.4s cubic-bezier(0.22,1,0.36,1) forwards; }
+        .stagger > *:nth-child(1){animation-delay:.05s}
+        .stagger > *:nth-child(2){animation-delay:.10s}
+        .stagger > *:nth-child(3){animation-delay:.15s}
+        .stagger > *:nth-child(4){animation-delay:.20s}
+        .stagger > *:nth-child(5){animation-delay:.25s}
+        .stagger > *:nth-child(6){animation-delay:.30s}
+        .stagger > *:nth-child(7){animation-delay:.35s}
+        .stagger > *:nth-child(8){animation-delay:.40s}
+
+        @keyframes skelShimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+        .shimmer-ov {
+          background: linear-gradient(105deg, transparent 35%, rgba(201,168,76,0.07) 50%, transparent 65%);
+          background-size: 200% 100%;
+          animation: shOv 3.5s infinite;
+        }
+        @keyframes shOv { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+        .dot-bg {
+          background-image: radial-gradient(circle, rgba(201,168,76,0.055) 1px, transparent 1px);
+          background-size: 18px 18px;
+        }
+
+        .pulse { animation: pulse 2.6s ease-in-out infinite; }
+        @keyframes pulse { 0%,100%{box-shadow:0 0 0 0 rgba(201,168,76,0.5)} 55%{box-shadow:0 0 0 9px rgba(201,168,76,0)} }
+
+        .press { transition: transform 0.18s; cursor: pointer; }
+        .press:active { transform: scale(0.975); }
+
+        .nav-btn { transition: all 0.2s; }
+        .nav-btn:hover { background: rgba(201,168,76,0.07) !important; }
+
+        .map-btn { transition: all 0.22s; }
+        .map-btn:hover { background: rgba(93,86,232,0.28) !important; transform: translateY(-1px); }
+        .map-btn:active { transform: scale(0.97); }
+
+        textarea:focus { border-color: rgba(201,168,76,0.45) !important; outline: none; }
       `}</style>
 
-      {/* Header */}
-      <div
+      {/* ── HEADER ─────────────────────────────────────────────────────────── */}
+      <header
         style={{
-          background: `linear-gradient(180deg, ${COLORS.deep} 0%, transparent 100%)`,
-          padding: "20px 20px 0",
+          background: `linear-gradient(180deg, #0D0D1A 0%, rgba(13,13,26,0.96) 100%)`,
+          backdropFilter: "blur(28px)",
+          WebkitBackdropFilter: "blur(28px)",
+          padding: "0 18px",
           position: "sticky",
           top: 0,
-          zIndex: 50,
-          backdropFilter: "blur(20px)",
+          zIndex: 100,
+          borderBottom: `1px solid ${C.border}`,
         }}
       >
         <div
           style={{
             display: "flex",
-            justifyContent: "space-between",
             alignItems: "center",
-            paddingBottom: 16,
-            borderBottom: `1px solid ${COLORS.border}`,
+            gap: 12,
+            padding: "16px 0 12px",
           }}
         >
-          <div style={{ flex: 1, paddingRight: 12 }}>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "center",
-                marginBottom: 18,
-              }}
-            >
-              <img
-                src={LOGO_URL}
-                alt="Acelera"
-                style={{
-                  width: "100%",
-                  maxWidth: 280,
-                  height: "auto",
-                  objectFit: "contain",
-                  filter: "drop-shadow(0 0 25px rgba(201,168,76,0.25))",
-                }}
-              />
-            </div>
+          {/* Logo */}
+          <img
+            src={LOGO_URL}
+            alt="Acelera"
+            style={{
+              width: 130,
+              height: 40,
+              objectFit: "contain",
+              filter: "drop-shadow(0 0 14px rgba(201,168,76,0.2))",
+            }}
+          />
 
+          {/* Course label */}
+          <div style={{ flex: 1, textAlign: "center" }}>
             <div
-              className="serif"
+              className="sans"
               style={{
-                fontSize: 11,
-                color: COLORS.gold,
+                fontSize: 8,
                 letterSpacing: 3,
+                color: C.gold,
                 textTransform: "uppercase",
               }}
             >
               Acesso Exclusivo
             </div>
             <div
-              className="serif"
+              className="dsp"
               style={{
-                fontSize: 20,
-                fontWeight: 700,
-                color: COLORS.white,
-                lineHeight: 1.2,
+                fontSize: 12.5,
+                fontWeight: 600,
+                color: C.offwhite,
+                lineHeight: 1.3,
               }}
             >
               {mockUser.course}{" "}
-              <span style={{ color: COLORS.gold }}>{mockUser.edition}</span>
+              <span style={{ color: C.gold }}>{mockUser.edition}</span>
             </div>
           </div>
+
+          {/* Avatar */}
           <div
-            className="pulse-ring"
+            className="pulse press"
             style={{
-              width: 44,
-              height: 44,
+              width: 40,
+              height: 40,
               borderRadius: "50%",
-              background: `linear-gradient(135deg, ${COLORS.gold}, #8B6914)`,
+              flexShrink: 0,
+              background: `linear-gradient(135deg, ${C.gold}, ${C.goldDim})`,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               fontFamily: "DM Sans",
               fontWeight: 700,
-              fontSize: 14,
-              color: COLORS.obsidian,
-              cursor: "pointer",
-              flexShrink: 0,
+              fontSize: 13,
+              color: C.obsidian,
             }}
           >
             {mockUser.avatar}
@@ -325,181 +371,230 @@ export default function App() {
         </div>
 
         {/* Nav */}
-        <div style={{ display: "flex", gap: 4, padding: "8px 0" }}>
+        <nav style={{ display: "flex", gap: 2, paddingBottom: 10 }}>
           {[
             { id: "home", icon: "✦", label: "Início" },
             { id: "content", icon: "▶", label: "Conteúdo" },
             { id: "community", icon: "◈", label: "Comunidade" },
             { id: "event", icon: "◉", label: "Evento" },
-          ].map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              style={{
-                flex: 1,
-                background: tab === t.id ? COLORS.goldGlow : "transparent",
-                border:
-                  tab === t.id
-                    ? `1px solid rgba(201,168,76,0.3)`
+          ].map((t) => {
+            const active = tab === t.id;
+            return (
+              <button
+                key={t.id}
+                className="nav-btn"
+                onClick={() => setTab(t.id)}
+                style={{
+                  flex: 1,
+                  background: active ? C.goldGlow : "transparent",
+                  border: active
+                    ? `1px solid rgba(201,168,76,0.28)`
                     : "1px solid transparent",
-                borderRadius: 8,
-                padding: "6px 4px",
-                cursor: "pointer",
-                color: tab === t.id ? COLORS.gold : COLORS.muted,
-                fontSize: 10,
-                fontFamily: "DM Sans",
-                fontWeight: 500,
-                transition: "all 0.2s",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                gap: 2,
-              }}
-            >
-              <span style={{ fontSize: 14 }}>{t.icon}</span>
-              {t.label}
-            </button>
-          ))}
-        </div>
-      </div>
+                  borderRadius: 8,
+                  padding: "6px 2px",
+                  cursor: "pointer",
+                  color: active ? C.gold : C.muted,
+                  fontSize: 9,
+                  fontFamily: "DM Sans",
+                  fontWeight: 500,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 3,
+                }}
+              >
+                <span style={{ fontSize: 13 }}>{t.icon}</span>
+                {t.label}
+              </button>
+            );
+          })}
+        </nav>
+      </header>
 
-      {/* Content area */}
-      <div style={{ padding: "0 16px 100px", overflow: "auto" }}>
-        {/* HOME TAB */}
+      {/* ── MAIN CONTENT ───────────────────────────────────────────────────── */}
+      <main style={{ padding: "0 18px 120px" }}>
+        {/* ══════════════════ HOME ══════════════════════════════════════════ */}
         {tab === "home" && (
-          <div className="tab-content">
+          <div className="tab-in stagger">
             {/* Welcome */}
-            <div style={{ padding: "20px 0 16px" }}>
+            <div style={{ padding: "28px 0 22px" }}>
               <div
                 className="sans"
-                style={{ fontSize: 13, color: COLORS.muted }}
+                style={{ fontSize: 11, color: C.muted, letterSpacing: 1 }}
               >
                 Olá de volta,
               </div>
               <div
-                className="serif"
+                className="dsp"
                 style={{
-                  fontSize: 26,
-                  fontWeight: 900,
-                  color: COLORS.white,
-                  lineHeight: 1.1,
+                  fontSize: 42,
+                  fontWeight: 700,
+                  lineHeight: 1,
+                  marginTop: 4,
                 }}
               >
-                {mockUser.name.split(" ")[0]}{" "}
-                <span style={{ color: COLORS.gold }}>✦</span>
+                {mockUser.name.split(" ")[0]}
+                <span style={{ color: C.gold }}> ✦</span>
               </div>
               <div
                 className="sans"
-                style={{ fontSize: 13, color: COLORS.muted, marginTop: 4 }}
+                style={{
+                  fontSize: 13,
+                  color: C.muted,
+                  marginTop: 8,
+                  lineHeight: 1.65,
+                }}
               >
-                A tua jornada começa antes do evento.
+                A tua jornada de carreira começa aqui,
+                <br />
+                muito antes do dia do evento.
               </div>
             </div>
 
-            {/* Countdown card */}
+            {/* Countdown hero */}
             <div
+              className="press"
               style={{
-                background: `linear-gradient(135deg, #1A1628 0%, #0F0F1A 100%)`,
-                border: `1px solid rgba(201,168,76,0.3)`,
-                borderRadius: 16,
-                padding: 20,
-                marginBottom: 16,
+                background: `linear-gradient(135deg, #18152E 0%, #0E0D1C 55%, #0A0C1A 100%)`,
+                border: `1px solid rgba(201,168,76,0.22)`,
+                borderRadius: 22,
+                padding: "22px 20px",
+                marginBottom: 20,
                 position: "relative",
                 overflow: "hidden",
+                boxShadow:
+                  "0 0 0 1px rgba(201,168,76,0.1), 0 12px 48px rgba(201,168,76,0.07)",
               }}
-              className="glow-gold"
             >
               <div
-                className="shimmer"
-                style={{ position: "absolute", inset: 0, borderRadius: 16 }}
+                className="shimmer-ov dot-bg"
+                style={{ position: "absolute", inset: 0, borderRadius: 22 }}
               />
-              <div
-                className="sans"
-                style={{
-                  fontSize: 11,
-                  color: COLORS.gold,
-                  letterSpacing: 3,
-                  textTransform: "uppercase",
-                  marginBottom: 12,
-                }}
-              >
-                Contagem Regressiva
-              </div>
-              <div
-                className="sans"
-                style={{ fontSize: 12, color: COLORS.muted, marginBottom: 12 }}
-              >
-                Data provisória: {mockUser.eventMonthLabel}
-              </div>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(4, 1fr)",
-                  gap: 8,
-                }}
-              >
-                {[
-                  ["d", "Dias"],
-                  ["h", "Horas"],
-                  ["m", "Min"],
-                  ["s", "Seg"],
-                ].map(([k, label]) => (
-                  <div
-                    key={k}
-                    style={{
-                      textAlign: "center",
-                      background: COLORS.card,
-                      borderRadius: 10,
-                      padding: "10px 4px",
-                    }}
-                  >
-                    <div
-                      className="serif"
-                      style={{
-                        fontSize: 28,
-                        fontWeight: 900,
-                        color: COLORS.gold,
-                        lineHeight: 1,
-                      }}
-                    >
-                      {String(countdown[k]).padStart(2, "0")}
-                    </div>
+              <div style={{ position: "relative", zIndex: 1 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
+                    marginBottom: 18,
+                  }}
+                >
+                  <div>
                     <div
                       className="sans"
                       style={{
-                        fontSize: 9,
-                        color: COLORS.muted,
+                        fontSize: 8,
+                        letterSpacing: 3,
+                        color: C.gold,
                         textTransform: "uppercase",
-                        letterSpacing: 1,
-                        marginTop: 2,
                       }}
                     >
-                      {label}
+                      Contagem Regressiva
+                    </div>
+                    <div
+                      className="dsp"
+                      style={{
+                        fontSize: 18,
+                        color: C.offwhite,
+                        marginTop: 3,
+                        fontStyle: "italic",
+                      }}
+                    >
+                      {mockUser.eventMonthLabel}
                     </div>
                   </div>
-                ))}
-              </div>
-              <div
-                className="sans"
-                style={{
-                  fontSize: 12,
-                  color: COLORS.muted,
-                  marginTop: 12,
-                  textAlign: "center",
-                }}
-              >
-                📍 Hotel Polana · Maputo · Sala Grandes Nomes
+                  <div
+                    style={{
+                      background: "rgba(201,168,76,0.1)",
+                      border: `1px solid rgba(201,168,76,0.22)`,
+                      borderRadius: 8,
+                      padding: "4px 12px",
+                      fontFamily: "DM Sans",
+                      fontSize: 10,
+                      color: C.gold,
+                    }}
+                  >
+                    data provisória
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(4,1fr)",
+                    gap: 8,
+                  }}
+                >
+                  {[
+                    ["d", "Dias"],
+                    ["h", "Horas"],
+                    ["m", "Min"],
+                    ["s", "Seg"],
+                  ].map(([k, label]) => (
+                    <div
+                      key={k}
+                      style={{
+                        background: "rgba(7,7,14,0.65)",
+                        borderRadius: 14,
+                        border: `1px solid rgba(201,168,76,0.1)`,
+                        padding: "14px 4px",
+                        textAlign: "center",
+                      }}
+                    >
+                      <div
+                        className="dsp"
+                        style={{
+                          fontSize: 36,
+                          fontWeight: 700,
+                          color: C.gold,
+                          lineHeight: 1,
+                        }}
+                      >
+                        {String(countdown[k]).padStart(2, "0")}
+                      </div>
+                      <div
+                        className="sans"
+                        style={{
+                          fontSize: 8,
+                          color: C.muted,
+                          textTransform: "uppercase",
+                          letterSpacing: 1.5,
+                          marginTop: 5,
+                        }}
+                      >
+                        {label}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    marginTop: 16,
+                  }}
+                >
+                  <span style={{ fontSize: 12 }}>📍</span>
+                  <span
+                    className="sans"
+                    style={{ fontSize: 11, color: C.muted }}
+                  >
+                    Hotel Polana · Maputo · Sala Grandes Nomes
+                  </span>
+                </div>
               </div>
             </div>
 
             {/* Progress */}
             <div
               style={{
-                background: COLORS.card,
-                border: `1px solid ${COLORS.border}`,
-                borderRadius: 16,
-                padding: 16,
-                marginBottom: 16,
+                background: C.card,
+                border: `1px solid ${C.border}`,
+                borderRadius: 18,
+                padding: "18px 20px",
+                marginBottom: 20,
               }}
             >
               <div
@@ -507,485 +602,562 @@ export default function App() {
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
-                  marginBottom: 10,
+                  marginBottom: 14,
                 }}
               >
-                <div className="sans" style={{ fontSize: 13, fontWeight: 500 }}>
-                  Preparação Pré-Evento
+                <div>
+                  <div
+                    className="sans"
+                    style={{ fontSize: 13, fontWeight: 600, color: C.white }}
+                  >
+                    Preparação Pré-Evento
+                  </div>
+                  <div
+                    className="sans"
+                    style={{ fontSize: 11, color: C.muted, marginTop: 3 }}
+                  >
+                    {completedModules} de {modules.length} módulos concluídos
+                  </div>
                 </div>
                 <div
-                  className="serif"
-                  style={{ fontSize: 18, color: COLORS.gold, fontWeight: 700 }}
+                  className="dsp"
+                  style={{
+                    fontSize: 40,
+                    fontWeight: 700,
+                    color: C.gold,
+                    lineHeight: 1,
+                  }}
                 >
-                  {progress}%
+                  {progress}
+                  <span style={{ fontSize: 18, color: C.goldDim }}>%</span>
                 </div>
               </div>
               <div
                 style={{
-                  background: COLORS.border,
+                  background: "rgba(255,255,255,0.05)",
                   borderRadius: 99,
-                  height: 6,
-                  overflow: "hidden",
+                  height: 4,
                 }}
               >
                 <div
                   style={{
                     width: `${progress}%`,
                     height: "100%",
-                    background: `linear-gradient(90deg, ${COLORS.gold}, ${COLORS.goldLight})`,
+                    background: `linear-gradient(90deg, ${C.goldDim}, ${C.gold}, ${C.goldLight})`,
                     borderRadius: 99,
-                    transition: "width 1s ease",
+                    transition: "width 1.4s cubic-bezier(0.22,1,0.36,1)",
+                    boxShadow: `0 0 8px ${C.gold}55`,
                   }}
                 />
               </div>
-              <div
-                className="sans"
-                style={{ fontSize: 11, color: COLORS.muted, marginTop: 8 }}
-              >
-                {completedModules} de {modules.length} módulos concluídos ·
-                continua assim 🔥
-              </div>
+              {progress < 100 && (
+                <div
+                  className="sans"
+                  style={{ fontSize: 11, color: C.muted, marginTop: 10 }}
+                >
+                  🔥 Continua — estás no bom caminho!
+                </div>
+              )}
             </div>
 
-            {/* Speakers preview */}
-            <div
-              className="sans"
-              style={{
-                fontSize: 12,
-                color: COLORS.muted,
-                letterSpacing: 2,
-                textTransform: "uppercase",
-                marginBottom: 10,
-              }}
-            >
-              Quem vais encontrar
-            </div>
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 10,
-                marginBottom: 16,
-              }}
-            >
-              {speakers.map((s, i) => (
+            {/* Speakers — só mostra se vier do Supabase */}
+            {speakers.length > 0 && (
+              <>
                 <div
-                  key={i}
-                  className="card-hover"
+                  className="sans"
                   style={{
-                    background: COLORS.card,
-                    border: `1px solid ${COLORS.border}`,
-                    borderRadius: 12,
-                    padding: "12px 14px",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 12,
+                    fontSize: 9,
+                    letterSpacing: 3,
+                    color: C.muted,
+                    textTransform: "uppercase",
+                    marginBottom: 12,
                   }}
                 >
-                  <div
-                    style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: "50%",
-                      background: `linear-gradient(135deg, ${s.color}33, ${s.color}66)`,
-                      border: `2px solid ${s.color}44`,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontFamily: "DM Sans",
-                      fontWeight: 700,
-                      fontSize: 13,
-                      color: s.color,
-                      flexShrink: 0,
-                    }}
-                  >
-                    {s.avatar}
-                  </div>
-                  <div style={{ flex: 1 }}>
+                  Quem vais encontrar
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 10,
+                    marginBottom: 20,
+                  }}
+                >
+                  {speakers.map((s, i) => (
                     <div
-                      className="sans"
+                      key={i}
+                      className="press"
                       style={{
-                        fontSize: 13,
-                        fontWeight: 600,
-                        color: COLORS.white,
+                        background: C.card,
+                        border: `1px solid ${C.border}`,
+                        borderRadius: 14,
+                        padding: "14px 16px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 14,
                       }}
                     >
-                      {s.name}
+                      <div
+                        style={{
+                          width: 50,
+                          height: 50,
+                          borderRadius: "50%",
+                          flexShrink: 0,
+                          background: `${s.color || C.gold}16`,
+                          border: `2px solid ${s.color || C.gold}30`,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontFamily: "DM Sans",
+                          fontWeight: 700,
+                          fontSize: 15,
+                          color: s.color || C.gold,
+                        }}
+                      >
+                        {s.avatar ||
+                          (s.name || "")
+                            .split(" ")
+                            .map((n) => n[0])
+                            .join("")
+                            .slice(0, 2)}
+                      </div>
+                      <div>
+                        <div
+                          className="sans"
+                          style={{
+                            fontSize: 14,
+                            fontWeight: 600,
+                            color: C.white,
+                          }}
+                        >
+                          {s.name}
+                        </div>
+                        <div
+                          className="sans"
+                          style={{ fontSize: 11, color: C.muted }}
+                        >
+                          {s.role}
+                        </div>
+                        {s.topic && (
+                          <div
+                            className="dsp"
+                            style={{
+                              fontSize: 13,
+                              fontStyle: "italic",
+                              color: s.color || C.gold,
+                              marginTop: 3,
+                            }}
+                          >
+                            "{s.topic}"
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div
-                      className="sans"
-                      style={{ fontSize: 11, color: COLORS.muted }}
-                    >
-                      {s.role}
-                    </div>
-                    <div
-                      className="sans"
-                      style={{ fontSize: 11, color: s.color, marginTop: 2 }}
-                    >
-                      "{s.topic}"
-                    </div>
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </>
+            )}
 
-            {/* Hype quote */}
+            {/* Quote */}
             <div
               style={{
-                background: `linear-gradient(135deg, ${COLORS.goldGlow}, transparent)`,
-                border: `1px solid rgba(201,168,76,0.2)`,
-                borderRadius: 16,
-                padding: 20,
+                background: `linear-gradient(135deg, rgba(201,168,76,0.07) 0%, rgba(93,86,232,0.04) 100%)`,
+                border: `1px solid rgba(201,168,76,0.14)`,
+                borderRadius: 22,
+                padding: "32px 26px",
                 textAlign: "center",
+                position: "relative",
+                overflow: "hidden",
               }}
             >
               <div
-                className="serif"
                 style={{
-                  fontSize: 18,
+                  position: "absolute",
+                  top: -20,
+                  right: -10,
+                  fontSize: 140,
+                  color: "rgba(201,168,76,0.04)",
+                  fontFamily: "Cormorant Garamond",
+                  lineHeight: 1,
+                  pointerEvents: "none",
+                  userSelect: "none",
+                }}
+              >
+                "
+              </div>
+              <div
+                className="dsp"
+                style={{
+                  fontSize: 21,
                   fontStyle: "italic",
-                  color: COLORS.white,
-                  lineHeight: 1.5,
+                  color: C.white,
+                  lineHeight: 1.65,
+                  position: "relative",
+                  zIndex: 1,
                 }}
               >
                 "Não é o programa que muda a carreira, é a pessoa que decides
                 tornar-te a partir dele."
               </div>
               <div
-                className="sans"
                 style={{
-                  fontSize: 11,
-                  color: COLORS.gold,
-                  marginTop: 8,
-                  letterSpacing: 1,
+                  marginTop: 18,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 10,
                 }}
               >
-                {" "}
-                Acelera Carreira Com Propossito 4.0
+                <div
+                  style={{
+                    height: 1,
+                    width: 28,
+                    background: `rgba(201,168,76,0.3)`,
+                  }}
+                />
+                <div
+                  className="sans"
+                  style={{
+                    fontSize: 9,
+                    letterSpacing: 2.5,
+                    color: C.gold,
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Acelera 4.0
+                </div>
+                <div
+                  style={{
+                    height: 1,
+                    width: 28,
+                    background: `rgba(201,168,76,0.3)`,
+                  }}
+                />
               </div>
             </div>
           </div>
         )}
 
-        {/* CONTENT TAB */}
+        {/* ══════════════════ CONTENT ═══════════════════════════════════════ */}
         {tab === "content" && (
-          <div className="tab-content">
-            <div style={{ padding: "20px 0 16px" }}>
-              <div className="serif" style={{ fontSize: 22, fontWeight: 700 }}>
-                Módulos <span style={{ color: COLORS.gold }}>Pré-Evento</span>
+          <div className="tab-in">
+            <div style={{ padding: "28px 0 20px" }}>
+              <div
+                className="dsp"
+                style={{ fontSize: 34, fontWeight: 700, lineHeight: 1.05 }}
+              >
+                Módulos <span style={{ color: C.gold }}>Pré-Evento</span>
               </div>
               <div
                 className="sans"
-                style={{ fontSize: 12, color: COLORS.muted, marginTop: 4 }}
+                style={{ fontSize: 13, color: C.muted, marginTop: 6 }}
               >
                 Prepara a tua mente antes de chegares.
               </div>
             </div>
 
-            {loadingModules && (
-              <div
-                style={{
-                  background: COLORS.card,
-                  border: `1px solid ${COLORS.border}`,
-                  borderRadius: 14,
-                  padding: 16,
-                  marginBottom: 10,
-                }}
-              >
-                <div
-                  className="sans"
-                  style={{ fontSize: 13, color: COLORS.muted }}
-                >
-                  A carregar módulos...
-                </div>
-              </div>
-            )}
+            {loadingModules &&
+              [1, 2, 3].map((i) => <Skeleton key={i} h={84} mb={10} />)}
 
             {!loadingModules && modules.length === 0 && (
               <div
                 style={{
-                  background: COLORS.card,
-                  border: `1px solid ${COLORS.border}`,
+                  background: C.card,
+                  border: `1px solid ${C.border}`,
                   borderRadius: 14,
-                  padding: 16,
-                  marginBottom: 10,
+                  padding: 20,
                 }}
               >
-                <div
-                  className="sans"
-                  style={{ fontSize: 13, color: COLORS.muted }}
-                >
-                  Nenhum módulo encontrado. Confirma se a tabela{" "}
-                  <strong style={{ color: COLORS.white }}>modules</strong> tem
-                  dados no Supabase.
+                <div className="sans" style={{ fontSize: 13, color: C.muted }}>
+                  Nenhum módulo encontrado. Confirma a tabela{" "}
+                  <strong style={{ color: C.white }}>modules</strong> no
+                  Supabase.
                 </div>
               </div>
             )}
 
-            {modules.map((m) => {
-              const isUnlocked =
-                m.unlocked ||
-                !m.unlock_date ||
-                new Date(m.unlock_date) <= new Date();
-
-              return (
-                <div
-                  key={m.id}
-                  className="card-hover"
-                  onClick={() =>
-                    isUnlocked &&
-                    setExpandedModule(expandedModule === m.id ? null : m.id)
-                  }
-                  style={{
-                    background: isUnlocked ? COLORS.card : `${COLORS.card}88`,
-                    border: `1px solid ${
-                      isUnlocked ? COLORS.border : COLORS.border + "55"
-                    }`,
-                    borderRadius: 14,
-                    padding: 16,
-                    marginBottom: 10,
-                    opacity: isUnlocked ? 1 : 0.6,
-                    cursor: isUnlocked ? "pointer" : "default",
-                    transition: "all 0.25s",
-                  }}
-                >
+            <div className="stagger">
+              {modules.map((m) => {
+                const unlocked =
+                  m.unlocked ||
+                  !m.unlock_date ||
+                  new Date(m.unlock_date) <= new Date();
+                const expanded = expandedModule === m.id;
+                return (
                   <div
-                    style={{ display: "flex", alignItems: "center", gap: 12 }}
+                    key={m.id}
+                    className="press"
+                    onClick={() =>
+                      unlocked && setExpanded(expanded ? null : m.id)
+                    }
+                    style={{
+                      background: unlocked ? C.card : `${C.card}99`,
+                      border: `1px solid ${
+                        unlocked ? C.border : C.border + "55"
+                      }`,
+                      borderRadius: 16,
+                      padding: 16,
+                      marginBottom: 10,
+                      opacity: unlocked ? 1 : 0.55,
+                      cursor: unlocked ? "pointer" : "default",
+                      transition: "all 0.25s",
+                    }}
                   >
                     <div
-                      style={{
-                        width: 46,
-                        height: 46,
-                        borderRadius: 12,
-                        background: isUnlocked
-                          ? COLORS.goldGlow
-                          : COLORS.surface,
-                        border: `1px solid ${
-                          isUnlocked ? COLORS.gold + "44" : COLORS.border
-                        }`,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: 22,
-                        flexShrink: 0,
-                      }}
+                      style={{ display: "flex", alignItems: "center", gap: 14 }}
                     >
-                      {m.icon || "▶"}
-                    </div>
-                    <div style={{ flex: 1 }}>
                       <div
                         style={{
+                          width: 50,
+                          height: 50,
+                          borderRadius: 14,
+                          flexShrink: 0,
+                          background: unlocked
+                            ? C.goldGlow
+                            : "rgba(255,255,255,0.03)",
+                          border: `1px solid ${
+                            unlocked ? C.borderGold : C.border
+                          }`,
                           display: "flex",
-                          justifyContent: "space-between",
                           alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: 24,
+                        }}
+                      >
+                        {m.icon || "▶"}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                          }}
+                        >
+                          <div
+                            className="sans"
+                            style={{
+                              fontSize: 14,
+                              fontWeight: 600,
+                              color: unlocked ? C.white : C.muted,
+                            }}
+                          >
+                            {m.title}
+                          </div>
+                          {!unlocked ? (
+                            <span style={{ fontSize: 13 }}>🔒</span>
+                          ) : (
+                            <span
+                              style={{
+                                fontSize: 13,
+                                color: C.muted,
+                                display: "inline-block",
+                                transform: expanded
+                                  ? "rotate(180deg)"
+                                  : "rotate(0)",
+                                transition: "transform 0.25s",
+                              }}
+                            >
+                              ▾
+                            </span>
+                          )}
+                        </div>
+                        <div
+                          className="sans"
+                          style={{ fontSize: 11, color: C.muted, marginTop: 3 }}
+                        >
+                          {m.duration || "Em breve"}
+                        </div>
+                      </div>
+                    </div>
+
+                    {unlocked && expanded && (
+                      <div
+                        style={{
+                          marginTop: 16,
+                          paddingTop: 16,
+                          borderTop: `1px solid ${C.border}`,
                         }}
                       >
                         <div
                           className="sans"
                           style={{
-                            fontSize: 14,
-                            fontWeight: 600,
-                            color: isUnlocked ? COLORS.white : COLORS.muted,
+                            fontSize: 13,
+                            color: C.offwhite,
+                            lineHeight: 1.7,
                           }}
                         >
-                          {m.title}
+                          {m.teaser}
                         </div>
-                        {!isUnlocked && (
-                          <span style={{ fontSize: 14 }}>🔒</span>
+                        {m.content_link ? (
+                          <a
+                            href={m.content_link}
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{
+                              display: "block",
+                              textAlign: "center",
+                              marginTop: 14,
+                              background: `linear-gradient(135deg, ${C.gold}, ${C.goldDim})`,
+                              borderRadius: 12,
+                              padding: "13px",
+                              fontFamily: "DM Sans",
+                              fontWeight: 700,
+                              fontSize: 14,
+                              color: C.obsidian,
+                              textDecoration: "none",
+                              boxShadow: "0 4px 20px rgba(201,168,76,0.22)",
+                            }}
+                          >
+                            ▶ Assistir Módulo
+                          </a>
+                        ) : (
+                          <div
+                            style={{
+                              marginTop: 14,
+                              background: "rgba(255,255,255,0.03)",
+                              border: `1px solid ${C.border}`,
+                              borderRadius: 12,
+                              padding: 13,
+                              textAlign: "center",
+                              fontFamily: "DM Sans",
+                              fontSize: 13,
+                              color: C.muted,
+                            }}
+                          >
+                            Link em breve
+                          </div>
                         )}
                       </div>
+                    )}
+
+                    {!unlocked && m.teaser && (
                       <div
-                        className="sans"
                         style={{
-                          fontSize: 11,
-                          color: COLORS.muted,
-                          marginTop: 3,
+                          marginTop: 10,
+                          padding: "10px 12px",
+                          background: "rgba(255,255,255,0.025)",
+                          borderRadius: 10,
                         }}
                       >
-                        {m.duration || "Em breve"}
+                        <div
+                          className="sans"
+                          style={{ fontSize: 12, color: C.muted }}
+                        >
+                          {m.teaser}
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
-
-                  {isUnlocked && expandedModule === m.id && (
-                    <div
-                      style={{
-                        marginTop: 14,
-                        paddingTop: 14,
-                        borderTop: `1px solid ${COLORS.border}`,
-                      }}
-                    >
-                      <div
-                        className="sans"
-                        style={{
-                          fontSize: 13,
-                          color: COLORS.white,
-                          lineHeight: 1.6,
-                        }}
-                      >
-                        {m.teaser}
-                      </div>
-
-                      {m.content_link ? (
-                        <a
-                          href={m.content_link}
-                          target="_blank"
-                          rel="noreferrer"
-                          style={{
-                            display: "block",
-                            textAlign: "center",
-                            marginTop: 12,
-                            width: "100%",
-                            background: `linear-gradient(135deg, ${COLORS.gold}, #8B6914)`,
-                            border: "none",
-                            borderRadius: 10,
-                            padding: "12px",
-                            fontFamily: "DM Sans",
-                            fontWeight: 700,
-                            fontSize: 14,
-                            color: COLORS.obsidian,
-                            cursor: "pointer",
-                            textDecoration: "none",
-                          }}
-                        >
-                          ▶ Assistir Módulo
-                        </a>
-                      ) : (
-                        <button
-                          style={{
-                            marginTop: 12,
-                            width: "100%",
-                            background: COLORS.surface,
-                            border: `1px solid ${COLORS.border}`,
-                            borderRadius: 10,
-                            padding: "12px",
-                            fontFamily: "DM Sans",
-                            fontWeight: 700,
-                            fontSize: 14,
-                            color: COLORS.muted,
-                            cursor: "default",
-                          }}
-                        >
-                          Link ainda não disponível
-                        </button>
-                      )}
-                    </div>
-                  )}
-
-                  {!isUnlocked && (
-                    <div
-                      style={{
-                        marginTop: 10,
-                        padding: "8px 12px",
-                        background: COLORS.surface,
-                        borderRadius: 8,
-                      }}
-                    >
-                      <div
-                        className="sans"
-                        style={{ fontSize: 12, color: COLORS.muted }}
-                      >
-                        {m.teaser ||
-                          "Este conteúdo será desbloqueado em breve."}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
 
             <div
               style={{
-                background: COLORS.accentGlow,
-                border: `1px solid rgba(108,99,255,0.3)`,
+                background: C.accentGlow,
+                border: `1px solid rgba(93,86,232,0.25)`,
                 borderRadius: 14,
-                padding: 16,
-                marginTop: 8,
+                padding: "16px 18px",
+                marginTop: 10,
               }}
             >
               <div
                 className="sans"
-                style={{ fontSize: 12, color: "#9B94FF", lineHeight: 1.6 }}
+                style={{ fontSize: 12, color: "#A09BFF", lineHeight: 1.7 }}
               >
-                🎁{" "}
-                <strong style={{ color: COLORS.white }}>
-                  Bónus exclusivo:
-                </strong>{" "}
+                🎁 <strong style={{ color: C.white }}>Bónus exclusivo:</strong>{" "}
                 Quem completa os módulos disponíveis recebe materiais de apoio
-                para acompanhar a jornada.
+                entregues no evento.
               </div>
             </div>
           </div>
         )}
 
-        {/* COMMUNITY TAB */}
+        {/* ══════════════════ COMMUNITY ═════════════════════════════════════ */}
         {tab === "community" && (
-          <div className="tab-content">
-            <div style={{ padding: "20px 0 16px" }}>
-              <div className="serif" style={{ fontSize: 22, fontWeight: 700 }}>
-                Comunidade <span style={{ color: COLORS.gold }}>✦</span>
+          <div className="tab-in">
+            <div style={{ padding: "28px 0 20px" }}>
+              <div className="dsp" style={{ fontSize: 34, fontWeight: 700 }}>
+                Comunidade <span style={{ color: C.gold }}>✦</span>
               </div>
               <div
                 className="sans"
-                style={{ fontSize: 12, color: COLORS.muted, marginTop: 2 }}
+                style={{ fontSize: 13, color: C.muted, marginTop: 4 }}
               >
                 {posts.length} participantes activos agora
               </div>
             </div>
 
-            {/* Post input */}
+            {/* Compose */}
             <div
               style={{
-                background: COLORS.card,
-                border: `1px solid ${COLORS.border}`,
-                borderRadius: 14,
-                padding: 14,
-                marginBottom: 16,
+                background: C.card,
+                border: `1px solid ${C.border}`,
+                borderRadius: 16,
+                padding: 16,
+                marginBottom: 18,
               }}
             >
-              <textarea
-                value={newMsg}
-                onChange={(e) => setNewMsg(e.target.value)}
-                placeholder="Partilha uma ideia, dúvida ou conquista..."
-                style={{
-                  width: "100%",
-                  background: "transparent",
-                  border: `1px solid ${COLORS.border}`,
-                  borderRadius: 8,
-                  padding: "10px 12px",
-                  color: COLORS.white,
-                  fontFamily: "DM Sans",
-                  fontSize: 13,
-                  resize: "none",
-                  height: 80,
-                  transition: "border 0.2s",
-                }}
-              />
+              <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
+                <div
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: "50%",
+                    flexShrink: 0,
+                    background: `linear-gradient(135deg, ${C.gold}, ${C.goldDim})`,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontFamily: "DM Sans",
+                    fontWeight: 700,
+                    fontSize: 12,
+                    color: C.obsidian,
+                  }}
+                >
+                  {mockUser.avatar}
+                </div>
+                <textarea
+                  value={newMsg}
+                  onChange={(e) => setNewMsg(e.target.value)}
+                  placeholder="Partilha uma ideia, dúvida ou conquista..."
+                  style={{
+                    flex: 1,
+                    background: "rgba(255,255,255,0.03)",
+                    border: `1px solid ${C.border}`,
+                    borderRadius: 10,
+                    padding: "10px 12px",
+                    color: C.white,
+                    fontFamily: "DM Sans",
+                    fontSize: 13,
+                    resize: "none",
+                    height: 78,
+                    transition: "border 0.2s",
+                  }}
+                />
+              </div>
               <div
                 style={{
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
-                  marginTop: 10,
                 }}
               >
-                <div
-                  className="sans"
-                  style={{ fontSize: 11, color: COLORS.muted }}
-                >
+                <div className="sans" style={{ fontSize: 10, color: C.muted }}>
                   Visível para todos os participantes
                 </div>
                 <button
                   onClick={sendMsg}
                   style={{
-                    background: `linear-gradient(135deg, ${COLORS.gold}, #8B6914)`,
+                    background: `linear-gradient(135deg, ${C.gold}, ${C.goldDim})`,
                     border: "none",
-                    borderRadius: 8,
-                    padding: "8px 18px",
+                    borderRadius: 10,
+                    padding: "9px 20px",
                     fontFamily: "DM Sans",
                     fontWeight: 700,
                     fontSize: 13,
-                    color: COLORS.obsidian,
+                    color: C.obsidian,
                     cursor: "pointer",
                   }}
                 >
@@ -995,338 +1167,549 @@ export default function App() {
             </div>
 
             {/* Posts */}
-            {posts.map((p) => (
-              <div
-                key={p.id}
-                className="card-hover"
-                style={{
-                  background: COLORS.card,
-                  border: `1px solid ${COLORS.border}`,
-                  borderRadius: 14,
-                  padding: 14,
-                  marginBottom: 10,
-                }}
-              >
-                <div style={{ display: "flex", gap: 10, marginBottom: 8 }}>
-                  <div
-                    style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: "50%",
-                      background: `${p.color}22`,
-                      border: `1px solid ${p.color}44`,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontFamily: "DM Sans",
-                      fontWeight: 700,
-                      fontSize: 12,
-                      color: p.color,
-                      flexShrink: 0,
-                    }}
-                  >
-                    {p.avatar}
-                  </div>
-                  <div>
-                    <div
-                      className="sans"
-                      style={{ fontSize: 13, fontWeight: 600 }}
-                    >
-                      {p.user}
-                    </div>
-                    <div
-                      className="sans"
-                      style={{ fontSize: 11, color: COLORS.muted }}
-                    >
-                      {p.time}
-                    </div>
-                  </div>
-                </div>
+            <div className="stagger">
+              {posts.map((p) => (
                 <div
-                  className="sans"
-                  style={{ fontSize: 13, color: COLORS.white, lineHeight: 1.6 }}
-                >
-                  {p.msg}
-                </div>
-                <div
+                  key={p.id}
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    marginTop: 10,
+                    background: C.card,
+                    border: `1px solid ${C.border}`,
+                    borderRadius: 16,
+                    padding: 16,
+                    marginBottom: 10,
                   }}
                 >
-                  <button
-                    onClick={() => toggleLike(p.id)}
+                  <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
+                    <div
+                      style={{
+                        width: 38,
+                        height: 38,
+                        borderRadius: "50%",
+                        flexShrink: 0,
+                        background: `${p.color}16`,
+                        border: `1px solid ${p.color}30`,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontFamily: "DM Sans",
+                        fontWeight: 700,
+                        fontSize: 12,
+                        color: p.color,
+                      }}
+                    >
+                      {p.avatar}
+                    </div>
+                    <div>
+                      <div
+                        className="sans"
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color: C.white,
+                        }}
+                      >
+                        {p.user}
+                      </div>
+                      <div
+                        className="sans"
+                        style={{ fontSize: 10, color: C.muted }}
+                      >
+                        {p.time}
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    className="sans"
                     style={{
-                      background: liked[p.id] ? COLORS.goldGlow : "transparent",
-                      border: `1px solid ${
-                        liked[p.id] ? COLORS.gold + "44" : COLORS.border
-                      }`,
-                      borderRadius: 20,
-                      padding: "4px 12px",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 5,
-                      color: liked[p.id] ? COLORS.gold : COLORS.muted,
-                      fontFamily: "DM Sans",
-                      fontSize: 12,
-                      transition: "all 0.2s",
+                      fontSize: 13,
+                      color: C.offwhite,
+                      lineHeight: 1.65,
                     }}
                   >
-                    {liked[p.id] ? "♥" : "♡"} {p.likes}
-                  </button>
-                  <button
-                    style={{
-                      background: "transparent",
-                      border: `1px solid ${COLORS.border}`,
-                      borderRadius: 20,
-                      padding: "4px 12px",
-                      cursor: "pointer",
-                      color: COLORS.muted,
-                      fontFamily: "DM Sans",
-                      fontSize: 12,
-                    }}
-                  >
-                    Responder
-                  </button>
+                    {p.msg}
+                  </div>
+                  <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                    <button
+                      onClick={() => toggleLike(p.id)}
+                      style={{
+                        background: liked[p.id] ? C.goldGlow2 : "transparent",
+                        border: `1px solid ${
+                          liked[p.id] ? C.borderGold : C.border
+                        }`,
+                        borderRadius: 20,
+                        padding: "5px 14px",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 5,
+                        color: liked[p.id] ? C.gold : C.muted,
+                        fontFamily: "DM Sans",
+                        fontSize: 12,
+                        transition: "all 0.2s",
+                      }}
+                    >
+                      {liked[p.id] ? "♥" : "♡"} {p.likes}
+                    </button>
+                    <button
+                      style={{
+                        background: "transparent",
+                        border: `1px solid ${C.border}`,
+                        borderRadius: 20,
+                        padding: "5px 14px",
+                        cursor: "pointer",
+                        color: C.muted,
+                        fontFamily: "DM Sans",
+                        fontSize: 12,
+                      }}
+                    >
+                      Responder
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         )}
 
-        {/* EVENT TAB */}
+        {/* ══════════════════ EVENT ═════════════════════════════════════════
+            Tabelas Supabase:
+              event_info  → venue_name, address, map_url, date_label, description
+              agenda      → time, title, type, sort_order
+              speakers    → name, role, topic, avatar, color, sort_order
+        ═══════════════════════════════════════════════════════════════════ */}
         {tab === "event" && (
-          <div className="tab-content">
-            <div style={{ padding: "20px 0 16px" }}>
-              <div className="serif" style={{ fontSize: 22, fontWeight: 700 }}>
-                O <span style={{ color: COLORS.gold }}>Evento</span>
+          <div className="tab-in">
+            <div style={{ padding: "28px 0 20px" }}>
+              <div className="dsp" style={{ fontSize: 34, fontWeight: 700 }}>
+                O <span style={{ color: C.gold }}>Evento</span>
               </div>
               <div
                 className="sans"
-                style={{ fontSize: 12, color: COLORS.muted, marginTop: 2 }}
+                style={{ fontSize: 13, color: C.muted, marginTop: 4 }}
               >
                 Sabe o que te espera.
               </div>
             </div>
 
-            {/* Location card */}
-            <div
-              style={{
-                background: `linear-gradient(135deg, #1A1628, #0F1420)`,
-                border: `1px solid rgba(108,99,255,0.3)`,
-                borderRadius: 16,
-                padding: 16,
-                marginBottom: 16,
-              }}
-            >
-              <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                <div
-                  style={{
-                    width: 48,
-                    height: 48,
-                    borderRadius: 12,
-                    background: COLORS.accentGlow,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: 24,
-                  }}
-                >
-                  📍
-                </div>
-                <div>
-                  <div
-                    className="sans"
-                    style={{ fontSize: 14, fontWeight: 600 }}
-                  >
-                    Hotel Polana — Sala Grandes Nomes
-                  </div>
-                  <div
-                    className="sans"
-                    style={{ fontSize: 12, color: COLORS.muted }}
-                  >
-                    Av. Julius Nyerere, Maputo
-                  </div>
-                  <div
-                    className="sans"
-                    style={{ fontSize: 12, color: "#9B94FF", marginTop: 2 }}
-                  >
-                    Ver no mapa →
-                  </div>
-                </div>
-              </div>
-            </div>
+            {loadingEvent && (
+              <>
+                <Skeleton h={100} mb={14} />
+                <Skeleton h={48} mb={10} />
+                <Skeleton h={48} mb={10} />
+                <Skeleton h={48} mb={10} />
+                <Skeleton h={48} mb={10} />
+              </>
+            )}
 
-            {/* Agenda */}
-            <div
-              className="sans"
-              style={{
-                fontSize: 12,
-                color: COLORS.muted,
-                letterSpacing: 2,
-                textTransform: "uppercase",
-                marginBottom: 12,
-              }}
-            >
-              Agenda do Dia
-            </div>
-            <div style={{ position: "relative" }}>
-              <div
-                style={{
-                  position: "absolute",
-                  left: 42,
-                  top: 0,
-                  bottom: 0,
-                  width: 1,
-                  background: COLORS.border,
-                }}
-              />
-              {agenda.map((a, i) => (
+            {!loadingEvent && (
+              <div className="stagger">
+                {/* Location */}
                 <div
-                  key={i}
                   style={{
-                    display: "flex",
-                    gap: 12,
-                    marginBottom: 12,
-                    alignItems: "flex-start",
+                    background: `linear-gradient(135deg, #14102A 0%, #0D0F20 100%)`,
+                    border: `1px solid rgba(93,86,232,0.22)`,
+                    borderRadius: 20,
+                    padding: 20,
+                    marginBottom: 18,
+                    boxShadow:
+                      "0 0 0 1px rgba(93,86,232,0.08), 0 10px 40px rgba(93,86,232,0.07)",
                   }}
                 >
                   <div
-                    className="sans"
                     style={{
-                      fontSize: 11,
-                      color: COLORS.muted,
-                      width: 36,
-                      textAlign: "right",
-                      paddingTop: 10,
-                      flexShrink: 0,
-                    }}
-                  >
-                    {a.time}
-                  </div>
-                  <div
-                    style={{
-                      width: 12,
-                      height: 12,
-                      borderRadius: "50%",
-                      background: typeColors[a.type],
-                      border: `2px solid ${COLORS.obsidian}`,
-                      flexShrink: 0,
-                      marginTop: 10,
-                      zIndex: 1,
-                    }}
-                  />
-                  <div
-                    style={{
-                      flex: 1,
-                      background: COLORS.card,
-                      border: `1px solid ${COLORS.border}`,
-                      borderRadius: 10,
-                      padding: "8px 12px",
+                      display: "flex",
+                      gap: 14,
+                      alignItems: "flex-start",
                     }}
                   >
                     <div
-                      className="sans"
                       style={{
-                        fontSize: 13,
-                        fontWeight: 500,
-                        color: COLORS.white,
+                        width: 54,
+                        height: 54,
+                        borderRadius: 14,
+                        flexShrink: 0,
+                        background: C.accentGlow,
+                        border: `1px solid rgba(93,86,232,0.25)`,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 26,
                       }}
                     >
-                      {a.title}
+                      📍
                     </div>
-                    <div
-                      style={{
-                        width: 6,
-                        height: 6,
-                        borderRadius: 99,
-                        background: typeColors[a.type],
-                        display: "inline-block",
-                        marginTop: 4,
-                      }}
-                    />
-                    <span
-                      className="sans"
-                      style={{
-                        fontSize: 10,
-                        color: typeColors[a.type],
-                        marginLeft: 5,
-                        textTransform: "capitalize",
-                      }}
-                    >
-                      {a.type}
-                    </span>
+                    <div style={{ flex: 1 }}>
+                      <div
+                        className="sans"
+                        style={{
+                          fontSize: 15,
+                          fontWeight: 700,
+                          color: C.white,
+                          lineHeight: 1.3,
+                        }}
+                      >
+                        {eventInfo?.venue_name ||
+                          "Hotel Polana — Sala Grandes Nomes"}
+                      </div>
+                      <div
+                        className="sans"
+                        style={{ fontSize: 12, color: C.muted, marginTop: 4 }}
+                      >
+                        {eventInfo?.address || "Av. Julius Nyerere, Maputo"}
+                      </div>
+                      {eventInfo?.date_label && (
+                        <div
+                          className="sans"
+                          style={{ fontSize: 11, color: C.gold, marginTop: 6 }}
+                        >
+                          📅 {eventInfo.date_label}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
 
-            {/* What to bring */}
-            <div
-              style={{
-                background: COLORS.card,
-                border: `1px solid ${COLORS.border}`,
-                borderRadius: 14,
-                padding: 16,
-                marginTop: 8,
-              }}
-            >
-              <div
-                className="sans"
-                style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}
-              >
-                O que trazer 📋
-              </div>
-              {[
-                "Bilhete (este app funciona como bilhete)",
-                "Cartão de visita ou contacto digital",
-                "Bloco de notas — vai querer escrever muito",
-                "Mente aberta e vontade de crescer",
-              ].map((item, i) => (
-                <div
-                  key={i}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    marginBottom: 8,
-                  }}
-                >
-                  <div
+                  {/* Open Map button — clicável */}
+                  <a
+                    href={mapUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="map-btn"
                     style={{
-                      width: 20,
-                      height: 20,
-                      borderRadius: "50%",
-                      background: COLORS.goldGlow,
-                      border: `1px solid ${COLORS.gold}44`,
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      fontSize: 10,
-                      color: COLORS.gold,
-                      flexShrink: 0,
+                      gap: 8,
+                      marginTop: 16,
+                      background: "rgba(93,86,232,0.15)",
+                      border: `1px solid rgba(93,86,232,0.28)`,
+                      borderRadius: 12,
+                      padding: "12px",
+                      fontFamily: "DM Sans",
+                      fontWeight: 600,
+                      fontSize: 13,
+                      color: "#A09BFF",
+                      textDecoration: "none",
                     }}
                   >
-                    ✓
-                  </div>
+                    🗺️ Abrir no Google Maps
+                  </a>
+
+                  {eventInfo?.description && (
+                    <div
+                      className="sans"
+                      style={{
+                        fontSize: 12,
+                        color: C.muted,
+                        marginTop: 14,
+                        lineHeight: 1.65,
+                      }}
+                    >
+                      {eventInfo.description}
+                    </div>
+                  )}
+                </div>
+
+                {/* Speakers */}
+                {speakers.length > 0 && (
+                  <>
+                    <div
+                      className="sans"
+                      style={{
+                        fontSize: 9,
+                        letterSpacing: 3,
+                        color: C.muted,
+                        textTransform: "uppercase",
+                        marginBottom: 12,
+                      }}
+                    >
+                      Oradores
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 10,
+                        marginBottom: 18,
+                      }}
+                    >
+                      {speakers.map((s, i) => (
+                        <div
+                          key={i}
+                          className="press"
+                          style={{
+                            background: C.card,
+                            border: `1px solid ${C.border}`,
+                            borderRadius: 14,
+                            padding: "14px 16px",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 14,
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: 50,
+                              height: 50,
+                              borderRadius: "50%",
+                              flexShrink: 0,
+                              background: `${s.color || C.gold}16`,
+                              border: `2px solid ${s.color || C.gold}28`,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              fontFamily: "DM Sans",
+                              fontWeight: 700,
+                              fontSize: 15,
+                              color: s.color || C.gold,
+                            }}
+                          >
+                            {s.avatar ||
+                              (s.name || "")
+                                .split(" ")
+                                .map((n) => n[0])
+                                .join("")
+                                .slice(0, 2)}
+                          </div>
+                          <div>
+                            <div
+                              className="sans"
+                              style={{
+                                fontSize: 14,
+                                fontWeight: 600,
+                                color: C.white,
+                              }}
+                            >
+                              {s.name}
+                            </div>
+                            <div
+                              className="sans"
+                              style={{ fontSize: 11, color: C.muted }}
+                            >
+                              {s.role}
+                            </div>
+                            {s.topic && (
+                              <div
+                                className="dsp"
+                                style={{
+                                  fontSize: 13,
+                                  fontStyle: "italic",
+                                  color: s.color || C.gold,
+                                  marginTop: 3,
+                                }}
+                              >
+                                "{s.topic}"
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {/* Agenda */}
+                {agenda.length > 0 && (
+                  <>
+                    <div
+                      className="sans"
+                      style={{
+                        fontSize: 9,
+                        letterSpacing: 3,
+                        color: C.muted,
+                        textTransform: "uppercase",
+                        marginBottom: 14,
+                      }}
+                    >
+                      Agenda do Dia
+                    </div>
+                    <div style={{ position: "relative", marginBottom: 18 }}>
+                      {/* timeline vertical line */}
+                      <div
+                        style={{
+                          position: "absolute",
+                          left: 44,
+                          top: 6,
+                          bottom: 6,
+                          width: 1,
+                          background: `linear-gradient(180deg, transparent, ${C.border} 8%, ${C.border} 92%, transparent)`,
+                        }}
+                      />
+
+                      {agenda.map((a, i) => {
+                        const dotColor = TYPE_COLORS[a.type] || C.muted;
+                        return (
+                          <div
+                            key={a.id || i}
+                            style={{
+                              display: "flex",
+                              gap: 10,
+                              marginBottom: 10,
+                              alignItems: "flex-start",
+                            }}
+                          >
+                            <div
+                              className="sans"
+                              style={{
+                                fontSize: 10,
+                                color: C.muted,
+                                width: 38,
+                                textAlign: "right",
+                                paddingTop: 11,
+                                flexShrink: 0,
+                              }}
+                            >
+                              {a.time}
+                            </div>
+                            <div
+                              style={{
+                                width: 12,
+                                height: 12,
+                                borderRadius: "50%",
+                                background: dotColor,
+                                border: `2px solid ${C.obsidian}`,
+                                flexShrink: 0,
+                                marginTop: 11,
+                                zIndex: 1,
+                                boxShadow: `0 0 8px ${dotColor}55`,
+                              }}
+                            />
+                            <div
+                              style={{
+                                flex: 1,
+                                background: C.card,
+                                border: `1px solid ${C.border}`,
+                                borderRadius: 12,
+                                padding: "10px 14px",
+                              }}
+                            >
+                              <div
+                                className="sans"
+                                style={{
+                                  fontSize: 13,
+                                  fontWeight: 500,
+                                  color: C.white,
+                                }}
+                              >
+                                {a.title}
+                              </div>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 5,
+                                  marginTop: 5,
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    width: 4,
+                                    height: 4,
+                                    borderRadius: "50%",
+                                    background: dotColor,
+                                  }}
+                                />
+                                <span
+                                  className="sans"
+                                  style={{
+                                    fontSize: 9,
+                                    color: dotColor,
+                                    textTransform: "capitalize",
+                                    letterSpacing: 0.5,
+                                  }}
+                                >
+                                  {a.type}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+
+                {/* What to bring */}
+                <div
+                  style={{
+                    background: C.card,
+                    border: `1px solid ${C.border}`,
+                    borderRadius: 16,
+                    padding: "18px 20px",
+                  }}
+                >
                   <div
                     className="sans"
-                    style={{ fontSize: 12, color: COLORS.muted }}
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: C.white,
+                      marginBottom: 14,
+                    }}
                   >
-                    {item}
+                    O que trazer 📋
                   </div>
+                  {[
+                    "Bilhete (este app funciona como bilhete)",
+                    "Cartão de visita ou contacto digital",
+                    "Bloco de notas — vais querer escrever muito",
+                    "Mente aberta e vontade de crescer",
+                  ].map((item, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 12,
+                        marginBottom: 12,
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 22,
+                          height: 22,
+                          borderRadius: "50%",
+                          flexShrink: 0,
+                          background: C.goldGlow,
+                          border: `1px solid ${C.borderGold}`,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: 10,
+                          color: C.gold,
+                        }}
+                      >
+                        ✓
+                      </div>
+                      <div
+                        className="sans"
+                        style={{ fontSize: 12, color: C.offwhite }}
+                      >
+                        {item}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
           </div>
         )}
-      </div>
+      </main>
 
-      {/* Bottom safe area */}
-      <div style={{ height: 20, background: COLORS.obsidian }} />
+      {/* Bottom fade */}
+      <div
+        style={{
+          position: "fixed",
+          bottom: 0,
+          left: "50%",
+          transform: "translateX(-50%)",
+          width: "100%",
+          maxWidth: 430,
+          height: 56,
+          background: `linear-gradient(0deg, ${C.obsidian} 0%, transparent 100%)`,
+          pointerEvents: "none",
+          zIndex: 10,
+        }}
+      />
     </div>
   );
 }
