@@ -382,31 +382,65 @@ function AuthScreen() {
 
   const submit = async (e) => {
     e.preventDefault();
+
     if (!email.trim() || !password.trim()) {
       setErr("Preenche o email e a senha.");
       return;
     }
+
     setLoading(true);
     setErr("");
+
     const cleanedEmail = email.trim().toLowerCase();
+    const displayName = name.trim() || cleanedEmail.split("@")[0];
+
     const result =
       mode === "signup"
         ? await supabase.auth.signUp({
             email: cleanedEmail,
             password,
             options: {
-              data: { name: name.trim() || cleanedEmail.split("@")[0] },
+              data: { name: displayName },
             },
           })
         : await supabase.auth.signInWithPassword({
             email: cleanedEmail,
             password,
           });
+
     if (result.error) {
       setErr(result.error.message);
       setLoading(false);
       return;
     }
+
+    // Ao criar conta, já criamos/actualizamos também o perfil público.
+    // Assim o utilizador aparece logo na tabela participants.
+    if (mode === "signup" && result.data?.user?.id) {
+      const { error: profileError } = await supabase
+        .from("participants")
+        .upsert(
+          {
+            id: result.data.user.id,
+            name: displayName,
+            email: cleanedEmail,
+            avatar: null,
+            progress: 0,
+            role: "user",
+          },
+          { onConflict: "id" }
+        );
+
+      if (profileError) {
+        setErr(
+          "Conta criada, mas houve erro ao criar o perfil: " +
+            profileError.message
+        );
+        setLoading(false);
+        return;
+      }
+    }
+
     setLoading(false);
   };
 
@@ -734,48 +768,87 @@ export default function App() {
 
   // ── Profile ──
   useEffect(() => {
-    if (!authUser?.id) {
-      setProfile(null);
-      return;
-    }
-    (async () => {
-      const { data, error } = await supabase
-        .from("participants")
-        .select("*")
-        .eq("id", authUser.id)
-        .maybeSingle();
-      if (!error && data) {
-        setProfile(data);
+    let cancelled = false;
+
+    async function loadOrCreateProfile() {
+      if (!authUser?.id) {
+        setProfile(null);
         return;
       }
+
       const fallback =
         authUser.user_metadata?.name ||
         authUser.email?.split("@")[0] ||
         "Participante";
-      const { data: created } = await supabase
+
+      // 1) Primeiro procura pelo id real do utilizador autenticado.
+      const { data: byId, error: byIdError } = await supabase
         .from("participants")
-        .insert({
-          id: authUser.id,
-          name: fallback,
-          email: authUser.email,
-          avatar: null,
-          progress: 0,
-          role: "user",
-        })
+        .select("*")
+        .eq("id", authUser.id)
+        .maybeSingle();
+
+      if (!cancelled && !byIdError && byId) {
+        setProfile(byId);
+        return;
+      }
+
+      // 2) Recuperação: se existir um perfil antigo com o mesmo email, liga-o ao id do Auth.
+      const { data: byEmail } = await supabase
+        .from("participants")
+        .select("*")
+        .eq("email", authUser.email)
+        .maybeSingle();
+
+      if (byEmail) {
+        const { data: recovered, error: recoverError } = await supabase
+          .from("participants")
+          .update({
+            id: authUser.id,
+            name: byEmail.name || fallback,
+            email: authUser.email,
+            avatar: byEmail.avatar || null,
+            progress: byEmail.progress || 0,
+            role: byEmail.role || "user",
+          })
+          .eq("email", authUser.email)
+          .select()
+          .single();
+
+        if (!cancelled && !recoverError && recovered) {
+          setProfile(recovered);
+          return;
+        }
+      }
+
+      // 3) Se não existir nada, cria o perfil novo.
+      const newProfile = {
+        id: authUser.id,
+        name: fallback,
+        email: authUser.email,
+        avatar: null,
+        progress: 0,
+        role: "user",
+      };
+
+      const { data: created, error: createError } = await supabase
+        .from("participants")
+        .upsert(newProfile, { onConflict: "id" })
         .select()
         .single();
-      if (created) setProfile(created);
-      else
-        setProfile({
-          id: authUser.id,
-          name: fallback,
-          email: authUser.email,
-          avatar: null,
-          progress: 0,
-          role: "user",
-        });
-    })();
-  }, [authUser?.id]);
+
+      if (!cancelled) {
+        if (!createError && created) setProfile(created);
+        else setProfile(newProfile);
+      }
+    }
+
+    loadOrCreateProfile();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authUser?.id, authUser?.email]);
 
   // ── Module progress ──
   useEffect(() => {
@@ -911,23 +984,28 @@ export default function App() {
   const ensureProfile = async () => {
     if (profile?.id) return profile;
     if (!authUser?.id) return null;
-    const { data } = await supabase
+
+    const fallbackProfile = {
+      id: authUser.id,
+      name: currentName,
+      email: currentEmail,
+      avatar: null,
+      progress: 0,
+      role: "user",
+    };
+
+    const { data, error } = await supabase
       .from("participants")
-      .insert({
-        id: authUser.id,
-        name: currentName,
-        email: currentEmail,
-        avatar: null,
-        progress: 0,
-        role: "user",
-      })
+      .upsert(fallbackProfile, { onConflict: "id" })
       .select()
       .single();
-    if (data) {
+
+    if (!error && data) {
       setProfile(data);
       return data;
     }
-    return null;
+
+    return fallbackProfile;
   };
 
   const markModuleDone = async (mod) => {
@@ -947,14 +1025,12 @@ export default function App() {
         .update({ completed: true, completed_at: new Date().toISOString() })
         .eq("id", ex.id);
     else
-      await supabase
-        .from("module_progress")
-        .insert({
-          participant_id: p.id,
-          module_id: mod.id,
-          completed: true,
-          completed_at: new Date().toISOString(),
-        });
+      await supabase.from("module_progress").insert({
+        participant_id: p.id,
+        module_id: mod.id,
+        completed: true,
+        completed_at: new Date().toISOString(),
+      });
     const next = completedModuleIds.size + 1;
     const nextP =
       modules.length > 0 ? Math.round((next / modules.length) * 100) : 0;
@@ -993,13 +1069,11 @@ export default function App() {
     if (!newMsg.trim()) return;
     const p = await ensureProfile();
     if (!p?.id) return;
-    await supabase
-      .from("community_posts")
-      .insert({
-        participant_id: p.id,
-        message: newMsg.trim(),
-        reply_to: replyingTo?.id || null,
-      });
+    await supabase.from("community_posts").insert({
+      participant_id: p.id,
+      message: newMsg.trim(),
+      reply_to: replyingTo?.id || null,
+    });
     setNewMsg("");
     setReplyingTo(null);
     fetchPosts();
