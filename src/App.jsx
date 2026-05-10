@@ -113,6 +113,79 @@ function useCountdown(targetDate) {
 
 // ─── Skeleton ────────────────────────────────────────────────────────────────
 function Skeleton({ h = 60, radius = 12, mb = 10 }) {
+  const ensureParticipantProfile = async () => {
+    if (profile?.id) return profile;
+
+    const { data, error } = await supabase
+      .from("participants")
+      .insert({
+        name: currentName,
+        email: currentEmail,
+        avatar: currentAvatarIsImage ? currentAvatar : null,
+        progress: progress || 0,
+        role: currentRole || "user",
+      })
+      .select()
+      .single();
+
+    if (error) {
+      alert("Erro ao criar perfil para progresso: " + error.message);
+      return null;
+    }
+
+    setProfile(data);
+    return data;
+  };
+
+  const markModuleCompleted = async (module) => {
+    if (!module?.id) return;
+
+    const participant = await ensureParticipantProfile();
+    if (!participant?.id) return;
+
+    // Actualiza visualmente de imediato
+    setCompletedModuleIds((prev) => {
+      const next = new Set(prev);
+      next.add(module.id);
+      return next;
+    });
+
+    const { data: existing } = await supabase
+      .from("module_progress")
+      .select("id")
+      .eq("participant_id", participant.id)
+      .eq("module_id", module.id)
+      .maybeSingle();
+
+    if (existing?.id) {
+      await supabase
+        .from("module_progress")
+        .update({ completed: true, completed_at: new Date().toISOString() })
+        .eq("id", existing.id);
+    } else {
+      await supabase.from("module_progress").insert({
+        participant_id: participant.id,
+        module_id: module.id,
+        completed: true,
+        completed_at: new Date().toISOString(),
+      });
+    }
+
+    const nextCompleted = new Set(completedModuleIds);
+    nextCompleted.add(module.id);
+    const nextProgress =
+      modules.length > 0
+        ? Math.round((nextCompleted.size / modules.length) * 100)
+        : 0;
+
+    await supabase
+      .from("participants")
+      .update({ progress: nextProgress })
+      .eq("id", participant.id);
+
+    setProfile((prev) => ({ ...prev, progress: nextProgress }));
+  };
+
   return (
     <div
       style={{
@@ -148,9 +221,10 @@ export default function App() {
   const [profile, setProfile] = useState(null);
   const [savingProfile, setSavingProfile] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [completedModuleIds, setCompletedModuleIds] = useState(new Set());
 
   const countdown = useCountdown(eventInfo?.event_date || mockUser.eventDate);
-  const completedModules = modules.filter((m) => m.completed).length;
+  const completedModules = completedModuleIds.size;
   const progress =
     modules.length > 0
       ? Math.round((completedModules / modules.length) * 100)
@@ -195,6 +269,25 @@ export default function App() {
       if (error) console.log("Erro participants:", error);
     })();
   }, []);
+
+  // Fetch module progress for current participant
+  useEffect(() => {
+    if (!profile?.id) return;
+
+    (async () => {
+      const { data, error } = await supabase
+        .from("module_progress")
+        .select("module_id, completed")
+        .eq("participant_id", profile.id)
+        .eq("completed", true);
+
+      if (!error && data) {
+        setCompletedModuleIds(new Set(data.map((row) => row.module_id)));
+      }
+
+      if (error) console.log("Erro module_progress:", error);
+    })();
+  }, [profile?.id]);
 
   // Fetch modules
   useEffect(() => {
@@ -1114,6 +1207,11 @@ export default function App() {
                           style={{ fontSize: 11, color: C.muted, marginTop: 3 }}
                         >
                           {m.duration || "Em breve"}
+                          {completedModuleIds.has(m.id) && (
+                            <span style={{ color: C.success, marginLeft: 8 }}>
+                              ✓ Concluído
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1141,6 +1239,7 @@ export default function App() {
                             href={m.content_link}
                             target="_blank"
                             rel="noreferrer"
+                            onClick={() => markModuleCompleted(m)}
                             style={{
                               display: "block",
                               textAlign: "center",
@@ -2075,7 +2174,7 @@ export default function App() {
                     className="dsp"
                     style={{ fontSize: 26, color: C.gold, lineHeight: 1 }}
                   >
-                    {profile?.progress ?? progress}%
+                    {progress}%
                   </div>
                 </div>
 
