@@ -25,6 +25,9 @@ devDependencies:
   '@types/react-dom':
     specifier: 18.2.15
     version: 18.2.15
+  '@types/scheduler':
+    specifier: ^0.26.0
+    version: 0.26.0
   '@vitejs/plugin-react':
     specifier: ^4.2.1
     version: 4.4.1(vite@5.4.21)
