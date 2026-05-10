@@ -1,26 +1,47 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "./supabaseClient";
 
-// ─── Design Tokens ───────────────────────────────────────────────────────────
+// ─── Design Tokens ─────────────────────────────────────────────────────────────
 const C = {
-  obsidian: "#07070E",
-  deep: "#0D0D1A",
-  card: "#141424",
-  cardHover: "#1A1A30",
-  border: "#22223A",
-  borderGold: "rgba(201,168,76,0.25)",
+  // Base
+  obsidian: "#05050F",
+  abyss: "#080814",
+  deep: "#0B0B1A",
+  surface: "#101022",
+  card: "#13132A",
+  cardRaised: "#181832",
+  cardHover: "#1C1C38",
+
+  // Borders
+  border: "rgba(255,255,255,0.06)",
+  borderMid: "rgba(255,255,255,0.10)",
+  borderGold: "rgba(201,168,76,0.22)",
+  borderGoldBright: "rgba(201,168,76,0.45)",
+
+  // Gold palette
   gold: "#C9A84C",
   goldLight: "#E8C97A",
   goldDim: "#8B6914",
-  goldGlow: "rgba(201,168,76,0.12)",
-  goldGlow2: "rgba(201,168,76,0.06)",
-  white: "#F2EDE4",
-  offwhite: "#C8C2B8",
-  muted: "#6A6A88",
-  accent: "#5D56E8",
-  accentGlow: "rgba(93,86,232,0.18)",
-  success: "#3D9E76",
-  danger: "#E8637A",
+  goldFaint: "rgba(201,168,76,0.08)",
+  goldGlow: "rgba(201,168,76,0.15)",
+  goldGlow2: "rgba(201,168,76,0.05)",
+
+  // Text
+  white: "#F0EBE1",
+  offwhite: "#C4BEB4",
+  muted: "#5A5A78",
+  faint: "#3A3A52",
+
+  // Accents
+  accent: "#6B5FEA",
+  accentLight: "#9B91FF",
+  accentGlow: "rgba(107,95,234,0.18)",
+  accentFaint: "rgba(107,95,234,0.07)",
+  success: "#3CB878",
+  successFaint: "rgba(60,184,120,0.1)",
+  danger: "#E85D75",
+  dangerFaint: "rgba(232,93,117,0.1)",
+  info: "#3B9EE8",
 };
 
 const LOGO_URL =
@@ -32,45 +53,6 @@ const COURSE_INFO = {
   eventDate: "2026-07-01T00:00:00+02:00",
   eventMonthLabel: "Julho de 2026",
 };
-
-const COMMUNITY_SEED = [
-  {
-    id: 1,
-    user: "Carlos M.",
-    avatar: "CM",
-    time: "há 2h",
-    msg: "Já apliquei a técnica do módulo 1 no meu negócio. Resultados em 3 dias! 🔥",
-    likes: 14,
-    color: C.gold,
-  },
-  {
-    id: 2,
-    user: "Flávia T.",
-    avatar: "FT",
-    time: "há 4h",
-    msg: "Alguém mais de Maputo que precisa de carona para o evento? Vamos organizar 😊",
-    likes: 7,
-    color: C.accent,
-  },
-  {
-    id: 3,
-    user: "Jorge A.",
-    avatar: "JA",
-    time: "há 6h",
-    msg: "Dúvida: o certificado é enviado por email depois? Ainda aguardo resposta do suporte.",
-    likes: 2,
-    color: C.success,
-  },
-  {
-    id: 4,
-    user: "Nilza P.",
-    avatar: "NP",
-    time: "ontem",
-    msg: "Módulo 2 mudou a forma como vejo o meu salão. Finalmente entendo o que me diferencia! 💅✨",
-    likes: 21,
-    color: C.danger,
-  },
-];
 
 const TYPE_COLORS = {
   keynote: C.gold,
@@ -85,6 +67,7 @@ const TYPE_COLORS = {
 
 const REACTION_EMOJIS = ["❤️", "🔥", "👏", "😂", "💡"];
 
+// ─── Utilities ─────────────────────────────────────────────────────────────────
 function initials(name = "") {
   return (
     name
@@ -100,39 +83,36 @@ function initials(name = "") {
 
 function formatTimeAgo(dateString) {
   if (!dateString) return "agora";
-  const date = new Date(dateString);
-  const diff = Date.now() - date.getTime();
-  const minutes = Math.floor(diff / 60000);
-  const hours = Math.floor(minutes / 60);
-  const days = Math.floor(hours / 24);
-
-  if (minutes < 1) return "agora";
-  if (minutes < 60) return `há ${minutes} min`;
-  if (hours < 24) return `há ${hours}h`;
-  if (days === 1) return "ontem";
-  if (days < 7) return `há ${days} dias`;
-
-  return date.toLocaleDateString("pt-PT", {
+  const diff = Date.now() - new Date(dateString).getTime();
+  const m = Math.floor(diff / 60000);
+  const h = Math.floor(m / 60);
+  const d = Math.floor(h / 24);
+  if (m < 1) return "agora";
+  if (m < 60) return `há ${m}m`;
+  if (h < 24) return `há ${h}h`;
+  if (d === 1) return "ontem";
+  if (d < 7) return `há ${d}d`;
+  return new Date(dateString).toLocaleDateString("pt-PT", {
     day: "2-digit",
     month: "short",
   });
 }
 
-function getProgressStage(progress) {
-  if (progress >= 100) return "Pronta para Escalar";
-  if (progress >= 75) return "Aceleradora";
-  if (progress >= 50) return "Estratégica";
-  if (progress >= 25) return "Em Movimento";
-  return "Exploradora";
+function getProgressStage(p) {
+  if (p >= 100) return { label: "Pronta para Escalar", icon: "🏆" };
+  if (p >= 75) return { label: "Aceleradora", icon: "🚀" };
+  if (p >= 50) return { label: "Estratégica", icon: "⚡" };
+  if (p >= 25) return { label: "Em Movimento", icon: "🔥" };
+  return { label: "Exploradora", icon: "✦" };
 }
 
-// ─── Countdown hook ───────────────────────────────────────────────────────────
+// ─── Hooks ────────────────────────────────────────────────────────────────────
 function useCountdown(targetDate) {
   const [time, setTime] = useState({ d: 0, h: 0, m: 0, s: 0 });
   useEffect(() => {
     const target = new Date(targetDate);
     const tick = () => {
-      const diff = target - new Date();
+      const diff = target - Date.now();
       if (diff <= 0) {
         setTime({ d: 0, h: 0, m: 0, s: 0 });
         return;
@@ -151,62 +131,282 @@ function useCountdown(targetDate) {
   return time;
 }
 
-// ─── Skeleton ────────────────────────────────────────────────────────────────
-function Skeleton({ h = 60, radius = 12, mb = 10 }) {
+// ─── Global CSS ───────────────────────────────────────────────────────────────
+const GLOBAL_CSS = `
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600;1,700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { -webkit-tap-highlight-color: transparent; }
+  body { background: #05050F; overscroll-behavior: none; }
+  .dsp { font-family: 'Cormorant Garamond', Georgia, serif; }
+  .sans { font-family: 'DM Sans', system-ui, sans-serif; }
+  ::-webkit-scrollbar { width: 0; height: 0; }
+
+  /* ── Animations ── */
+  @keyframes fadeUp   { from { opacity:0; transform:translateY(20px) } to { opacity:1; transform:translateY(0) } }
+  @keyframes fadeIn   { from { opacity:0 } to { opacity:1 } }
+  @keyframes scaleIn  { from { opacity:0; transform:scale(0.94) } to { opacity:1; transform:scale(1) } }
+  @keyframes slideUp  { from { opacity:0; transform:translateY(100%) } to { opacity:1; transform:translateY(0) } }
+  @keyframes shimmer  { 0% { background-position:200% 0 } 100% { background-position:-200% 0 } }
+  @keyframes pulse    { 0%,100%{ box-shadow:0 0 0 0 rgba(201,168,76,0.55) } 60%{ box-shadow:0 0 0 8px rgba(201,168,76,0) } }
+  @keyframes spin     { to { transform:rotate(360deg) } }
+  @keyframes orb1     { 0%,100%{transform:translate(0,0) scale(1)} 33%{transform:translate(30px,-20px) scale(1.1)} 66%{transform:translate(-20px,10px) scale(0.95)} }
+  @keyframes orb2     { 0%,100%{transform:translate(0,0) scale(1)} 40%{transform:translate(-25px,20px) scale(1.05)} 70%{transform:translate(15px,-15px) scale(0.9)} }
+  @keyframes glow     { 0%,100%{opacity:0.4} 50%{opacity:0.75} }
+  @keyframes countUp  { from{transform:translateY(8px);opacity:0} to{transform:translateY(0);opacity:1} }
+  @keyframes progressFill { from{width:0} to{width:var(--target-w)} }
+  @keyframes tabBounce { 0%{transform:scale(1)} 40%{transform:scale(0.93)} 75%{transform:scale(1.04)} 100%{transform:scale(1)} }
+
+  .fade-up   { animation: fadeUp  .45s cubic-bezier(0.22,1,0.36,1) both; }
+  .fade-in   { animation: fadeIn  .35s ease both; }
+  .scale-in  { animation: scaleIn .35s cubic-bezier(0.22,1,0.36,1) both; }
+  .slide-up  { animation: slideUp .5s  cubic-bezier(0.22,1,0.36,1) both; }
+
+  .stagger > * { animation: fadeUp .45s cubic-bezier(0.22,1,0.36,1) both; }
+  .stagger > *:nth-child(1){animation-delay:.04s}
+  .stagger > *:nth-child(2){animation-delay:.09s}
+  .stagger > *:nth-child(3){animation-delay:.14s}
+  .stagger > *:nth-child(4){animation-delay:.19s}
+  .stagger > *:nth-child(5){animation-delay:.24s}
+  .stagger > *:nth-child(6){animation-delay:.29s}
+  .stagger > *:nth-child(7){animation-delay:.34s}
+  .stagger > *:nth-child(8){animation-delay:.39s}
+  .stagger > *:nth-child(9){animation-delay:.44s}
+
+  .press { cursor:pointer; transition:transform .15s, opacity .15s; -webkit-user-select:none; user-select:none; }
+  .press:active { transform:scale(0.97); opacity:0.85; }
+
+  .glass {
+    background: rgba(20,20,44,0.75);
+    backdrop-filter: blur(24px) saturate(160%);
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
+  }
+
+  .skel {
+    background: linear-gradient(90deg, #101022 25%, #181832 50%, #101022 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.8s infinite;
+    border-radius: 12px;
+  }
+
+  input, textarea { caret-color: #C9A84C; }
+  input:focus, textarea:focus { outline:none; border-color: rgba(201,168,76,0.45) !important; }
+  input::placeholder, textarea::placeholder { color: rgba(90,90,120,0.7); }
+
+  .nav-pill { transition: all .22s cubic-bezier(0.22,1,0.36,1); }
+  .nav-pill.active { animation: tabBounce .35s cubic-bezier(0.22,1,0.36,1); }
+
+  .card-hover { transition: border-color .2s, transform .2s, box-shadow .2s; }
+  .card-hover:hover { border-color: rgba(201,168,76,0.28) !important; transform: translateY(-1px); box-shadow: 0 8px 40px rgba(0,0,0,0.35); }
+
+  .reaction-pill { transition: all .18s cubic-bezier(0.22,1,0.36,1); }
+  .reaction-pill:hover { transform: translateY(-2px) scale(1.08); }
+
+  .emoji-btn { transition: transform .18s cubic-bezier(0.22,1,0.36,1); }
+  .emoji-btn:hover { transform: scale(1.18) translateY(-2px); }
+
+  .gold-btn {
+    background: linear-gradient(135deg, #E8C97A 0%, #C9A84C 45%, #8B6914 100%);
+    box-shadow: 0 4px 24px rgba(201,168,76,0.3), inset 0 1px 0 rgba(255,255,255,0.15);
+    transition: all .22s;
+  }
+  .gold-btn:hover  { box-shadow: 0 6px 32px rgba(201,168,76,0.45), inset 0 1px 0 rgba(255,255,255,0.18); transform: translateY(-1px); }
+  .gold-btn:active { transform: scale(0.97) translateY(0); box-shadow: 0 2px 12px rgba(201,168,76,0.3); }
+
+  .pulse { animation: pulse 2.8s ease-in-out infinite; }
+`;
+
+// ─── Orb Background ──────────────────────────────────────────────────────────
+function OrbBg({ variant = "gold" }) {
+  const isGold = variant === "gold";
   return (
     <div
       style={{
-        height: h,
-        borderRadius: radius,
-        marginBottom: mb,
-        background: `linear-gradient(90deg, ${C.card} 25%, ${C.cardHover} 50%, ${C.card} 75%)`,
-        backgroundSize: "200% 100%",
-        animation: "skelShimmer 1.6s infinite",
+        position: "absolute",
+        inset: 0,
+        overflow: "hidden",
+        pointerEvents: "none",
+        borderRadius: "inherit",
+      }}
+    >
+      <div
+        style={{
+          position: "absolute",
+          width: 220,
+          height: 220,
+          borderRadius: "50%",
+          background: isGold
+            ? "radial-gradient(circle, rgba(201,168,76,0.22) 0%, transparent 70%)"
+            : "radial-gradient(circle, rgba(107,95,234,0.22) 0%, transparent 70%)",
+          top: "-40px",
+          right: "-40px",
+          animation: "orb1 8s ease-in-out infinite",
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          width: 160,
+          height: 160,
+          borderRadius: "50%",
+          background: isGold
+            ? "radial-gradient(circle, rgba(201,168,76,0.12) 0%, transparent 70%)"
+            : "radial-gradient(circle, rgba(107,95,234,0.12) 0%, transparent 70%)",
+          bottom: "-20px",
+          left: "-20px",
+          animation: "orb2 11s ease-in-out infinite",
+        }}
+      />
+    </div>
+  );
+}
+
+// ─── Skeleton ─────────────────────────────────────────────────────────────────
+function Skeleton({ h = 64, mb = 10, radius = 14 }) {
+  return (
+    <div
+      className="skel"
+      style={{ height: h, marginBottom: mb, borderRadius: radius }}
+    />
+  );
+}
+
+// ─── Avatar ───────────────────────────────────────────────────────────────────
+function Avatar({ src, name, size = 42, fontSize = 13 }) {
+  const isImg = typeof src === "string" && src.startsWith("http");
+  return (
+    <div
+      style={{
+        width: size,
+        height: size,
+        borderRadius: "50%",
+        flexShrink: 0,
+        background: isImg
+          ? `url(${src}) center/cover no-repeat`
+          : `linear-gradient(135deg, ${C.gold}, ${C.goldDim})`,
+        border: `1.5px solid rgba(201,168,76,0.3)`,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontFamily: "DM Sans",
+        fontWeight: 800,
+        fontSize,
+        color: C.obsidian,
+      }}
+    >
+      {!isImg && initials(name)}
+    </div>
+  );
+}
+
+// ─── Badge ────────────────────────────────────────────────────────────────────
+function Badge({
+  children,
+  color = C.gold,
+  bg = C.goldFaint,
+  border = C.borderGold,
+}) {
+  return (
+    <span
+      className="sans"
+      style={{
+        display: "inline-block",
+        background: bg,
+        border: `1px solid ${border}`,
+        borderRadius: 999,
+        padding: "3px 9px",
+        fontSize: 9,
+        fontWeight: 800,
+        color,
+        letterSpacing: 0.5,
+        textTransform: "uppercase",
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
+// ─── Divider ──────────────────────────────────────────────────────────────────
+function Divider({ my = 24 }) {
+  return (
+    <div
+      style={{
+        height: 1,
+        margin: `${my}px 0`,
+        background: `linear-gradient(90deg, transparent, ${C.border} 20%, ${C.border} 80%, transparent)`,
       }}
     />
   );
 }
 
+// ─── Section Label ────────────────────────────────────────────────────────────
+function SectionLabel({ children }) {
+  return (
+    <div
+      className="sans"
+      style={{
+        fontSize: 9,
+        letterSpacing: 3.5,
+        color: C.muted,
+        textTransform: "uppercase",
+        marginBottom: 14,
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+      }}
+    >
+      <span
+        style={{ display: "block", height: 1, width: 16, background: C.faint }}
+      />
+      {children}
+      <span
+        style={{
+          display: "block",
+          height: 1,
+          flex: 1,
+          background: `linear-gradient(90deg, ${C.faint}, transparent)`,
+        }}
+      />
+    </div>
+  );
+}
+
+// ─── Auth Screen ──────────────────────────────────────────────────────────────
 function AuthScreen() {
   const [mode, setMode] = useState("login");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
 
-  const submitAuth = async (e) => {
+  const submit = async (e) => {
     e.preventDefault();
     if (!email.trim() || !password.trim()) {
-      alert("Preenche o email e a senha.");
+      setErr("Preenche o email e a senha.");
       return;
     }
-
     setLoading(true);
-
+    setErr("");
     const cleanedEmail = email.trim().toLowerCase();
-    let result;
-
-    if (mode === "signup") {
-      result = await supabase.auth.signUp({
-        email: cleanedEmail,
-        password,
-        options: {
-          data: { name: name.trim() || cleanedEmail.split("@")[0] },
-        },
-      });
-    } else {
-      result = await supabase.auth.signInWithPassword({
-        email: cleanedEmail,
-        password,
-      });
-    }
-
+    const result =
+      mode === "signup"
+        ? await supabase.auth.signUp({
+            email: cleanedEmail,
+            password,
+            options: {
+              data: { name: name.trim() || cleanedEmail.split("@")[0] },
+            },
+          })
+        : await supabase.auth.signInWithPassword({
+            email: cleanedEmail,
+            password,
+          });
     if (result.error) {
-      alert(result.error.message);
+      setErr(result.error.message);
       setLoading(false);
       return;
     }
-
     setLoading(false);
   };
 
@@ -214,66 +414,92 @@ function AuthScreen() {
     <div
       style={{
         fontFamily: "Georgia, serif",
-        background: `radial-gradient(circle at top, rgba(201,168,76,0.14), transparent 34%), ${C.obsidian}`,
+        background: C.obsidian,
         minHeight: "100vh",
         color: C.white,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         padding: 22,
+        position: "relative",
+        overflow: "hidden",
       }}
     >
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=DM+Sans:wght@400;500;700;800&display=swap');
-        * { box-sizing: border-box; }
-        body { background: #07070E; }
-        .dsp { font-family: 'Cormorant Garamond', Georgia, serif; }
-        .sans { font-family: 'DM Sans', sans-serif; }
-        input:focus { border-color: rgba(201,168,76,0.45) !important; outline: none; }
-      `}</style>
+      <style>{GLOBAL_CSS}</style>
+      {/* Background orbs */}
+      <div style={{ position: "fixed", inset: 0, pointerEvents: "none" }}>
+        <div
+          style={{
+            position: "absolute",
+            width: 600,
+            height: 600,
+            borderRadius: "50%",
+            background:
+              "radial-gradient(circle, rgba(201,168,76,0.07) 0%, transparent 60%)",
+            top: "-200px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            animation: "glow 6s ease-in-out infinite",
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            width: 400,
+            height: 400,
+            borderRadius: "50%",
+            background:
+              "radial-gradient(circle, rgba(107,95,234,0.07) 0%, transparent 60%)",
+            bottom: "-100px",
+            right: "-100px",
+            animation: "glow 8s ease-in-out infinite reverse",
+          }}
+        />
+      </div>
 
       <div
+        className="scale-in"
         style={{
           width: "100%",
-          maxWidth: 430,
-          background: `linear-gradient(180deg, ${C.cardHover} 0%, ${C.deep} 100%)`,
+          maxWidth: 420,
+          position: "relative",
+          background: "rgba(16,16,34,0.85)",
+          backdropFilter: "blur(40px)",
+          WebkitBackdropFilter: "blur(40px)",
           border: `1px solid ${C.borderGold}`,
           borderRadius: 28,
-          padding: 24,
-          boxShadow: "0 24px 90px rgba(0,0,0,0.45)",
+          padding: "32px 28px",
+          boxShadow:
+            "0 32px 100px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.05)",
         }}
       >
-        <div style={{ textAlign: "center", marginBottom: 24 }}>
+        <OrbBg />
+        <div
+          style={{
+            textAlign: "center",
+            marginBottom: 28,
+            position: "relative",
+          }}
+        >
           <img
             src={LOGO_URL}
             alt="Acelera"
             style={{
-              width: 230,
-              maxWidth: "100%",
-              height: 72,
+              width: 220,
+              height: 68,
               objectFit: "contain",
-              filter: "drop-shadow(0 0 18px rgba(201,168,76,0.2))",
-              marginBottom: 14,
+              filter: "drop-shadow(0 0 24px rgba(201,168,76,0.25))",
+              marginBottom: 16,
             }}
           />
-          <div
-            className="sans"
-            style={{
-              fontSize: 10,
-              letterSpacing: 3,
-              color: C.gold,
-              textTransform: "uppercase",
-            }}
-          >
-            Acesso Exclusivo
-          </div>
+          <Badge>Acesso Exclusivo</Badge>
           <div
             className="dsp"
             style={{
-              fontSize: 30,
+              fontSize: 34,
               fontWeight: 700,
-              marginTop: 8,
-              lineHeight: 1.1,
+              marginTop: 10,
+              lineHeight: 1,
             }}
           >
             Acelera <span style={{ color: C.gold }}>4.0</span>
@@ -283,129 +509,83 @@ function AuthScreen() {
             style={{
               fontSize: 13,
               color: C.muted,
-              marginTop: 8,
+              marginTop: 10,
               lineHeight: 1.6,
             }}
           >
-            Entra na tua área de preparação, comunidade e jornada pré-evento.
+            A tua área de preparação, comunidade
+            <br />e jornada pré-evento.
           </div>
         </div>
 
         <form
-          onSubmit={submitAuth}
+          onSubmit={submit}
           style={{ display: "flex", flexDirection: "column", gap: 12 }}
         >
           {mode === "signup" && (
-            <div>
-              <label
-                className="sans"
-                style={{
-                  fontSize: 11,
-                  color: C.muted,
-                  display: "block",
-                  marginBottom: 6,
-                }}
-              >
-                Nome
-              </label>
+            <Field label="Nome">
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="O teu nome"
-                style={{
-                  width: "100%",
-                  background: "rgba(255,255,255,0.035)",
-                  border: `1px solid ${C.border}`,
-                  borderRadius: 14,
-                  padding: "14px",
-                  color: C.white,
-                  fontFamily: "DM Sans",
-                  fontSize: 14,
-                }}
+                style={inputStyle}
               />
-            </div>
+            </Field>
           )}
-
-          <div>
-            <label
-              className="sans"
-              style={{
-                fontSize: 11,
-                color: C.muted,
-                display: "block",
-                marginBottom: 6,
-              }}
-            >
-              Email
-            </label>
+          <Field label="Email">
             <input
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               type="email"
               placeholder="teuemail@exemplo.com"
-              style={{
-                width: "100%",
-                background: "rgba(255,255,255,0.035)",
-                border: `1px solid ${C.border}`,
-                borderRadius: 14,
-                padding: "14px",
-                color: C.white,
-                fontFamily: "DM Sans",
-                fontSize: 14,
-              }}
+              style={inputStyle}
             />
-          </div>
-
-          <div>
-            <label
-              className="sans"
-              style={{
-                fontSize: 11,
-                color: C.muted,
-                display: "block",
-                marginBottom: 6,
-              }}
-            >
-              Senha
-            </label>
+          </Field>
+          <Field label="Senha">
             <input
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               type="password"
               placeholder="mínimo 6 caracteres"
-              style={{
-                width: "100%",
-                background: "rgba(255,255,255,0.035)",
-                border: `1px solid ${C.border}`,
-                borderRadius: 14,
-                padding: "14px",
-                color: C.white,
-                fontFamily: "DM Sans",
-                fontSize: 14,
-              }}
+              style={inputStyle}
             />
-          </div>
+          </Field>
+
+          {err && (
+            <div
+              className="sans"
+              style={{
+                fontSize: 12,
+                color: C.danger,
+                background: C.dangerFaint,
+                border: `1px solid rgba(232,93,117,0.2)`,
+                borderRadius: 10,
+                padding: "10px 12px",
+              }}
+            >
+              {err}
+            </div>
+          )}
 
           <button
             type="submit"
             disabled={loading}
+            className="gold-btn sans"
             style={{
               width: "100%",
               marginTop: 8,
-              background: `linear-gradient(135deg, ${C.gold}, ${C.goldDim})`,
               border: "none",
               borderRadius: 16,
               padding: "15px",
-              fontFamily: "DM Sans",
               fontWeight: 800,
               fontSize: 14,
               color: C.obsidian,
               cursor: loading ? "not-allowed" : "pointer",
-              opacity: loading ? 0.75 : 1,
+              opacity: loading ? 0.7 : 1,
             }}
           >
             {loading
-              ? "A processar..."
+              ? "A processar…"
               : mode === "signup"
               ? "Criar conta"
               : "Entrar"}
@@ -413,63 +593,109 @@ function AuthScreen() {
         </form>
 
         <button
-          onClick={() => setMode(mode === "signup" ? "login" : "signup")}
+          onClick={() => {
+            setMode((m) => (m === "signup" ? "login" : "signup"));
+            setErr("");
+          }}
+          className="sans"
           style={{
             width: "100%",
-            marginTop: 16,
+            marginTop: 12,
             background: "transparent",
             border: `1px solid ${C.border}`,
             borderRadius: 14,
             padding: "12px",
             color: C.offwhite,
-            fontFamily: "DM Sans",
             cursor: "pointer",
+            fontSize: 13,
+            transition: "all .2s",
           }}
         >
-          {mode === "signup" ? "Já tenho conta" : "Criar nova conta"}
+          {mode === "signup" ? "Já tenho conta — Entrar" : "Criar nova conta"}
         </button>
       </div>
     </div>
   );
 }
 
-// ─── App ─────────────────────────────────────────────────────────────────────
+const inputStyle = {
+  width: "100%",
+  background: "rgba(255,255,255,0.03)",
+  border: `1px solid ${C.border}`,
+  borderRadius: 14,
+  padding: "14px 16px",
+  color: "#F0EBE1",
+  fontFamily: "DM Sans",
+  fontSize: 14,
+  transition: "border-color .2s",
+};
+
+function Field({ label, children }) {
+  return (
+    <div>
+      <label
+        className="sans"
+        style={{
+          fontSize: 11,
+          color: C.muted,
+          display: "block",
+          marginBottom: 7,
+          letterSpacing: 0.3,
+        }}
+      >
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+// ─── Main App ─────────────────────────────────────────────────────────────────
 export default function App() {
+  // Auth
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+
+  // Navigation
   const [tab, setTab] = useState("home");
-  const [liked, setLiked] = useState({});
-  const [newMsg, setNewMsg] = useState("");
+  const prevTab = useRef("home");
+
+  // Profile
+  const [profile, setProfile] = useState(null);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  // Content
+  const [modules, setModules] = useState([]);
+  const [loadingModules, setLoadingModules] = useState(true);
+  const [expandedModule, setExpandedModule] = useState(null);
+  const [completedModuleIds, setCompletedModuleIds] = useState(new Set());
+
+  // Community
   const [posts, setPosts] = useState([]);
   const [loadingCommunity, setLoadingCommunity] = useState(true);
+  const [newMsg, setNewMsg] = useState("");
   const [replyingTo, setReplyingTo] = useState(null);
   const [reactionPickerFor, setReactionPickerFor] = useState(null);
-  const [expandedModule, setExpanded] = useState(null);
 
-  // Supabase data
-  const [modules, setModules] = useState([]);
-  const [loadingModules, setLoadMod] = useState(true);
+  // Event
   const [eventInfo, setEventInfo] = useState(null);
   const [agenda, setAgenda] = useState([]);
   const [speakers, setSpeakers] = useState([]);
-  const [loadingEvent, setLoadEvent] = useState(true);
+  const [loadingEvent, setLoadingEvent] = useState(true);
 
-  // Profile data
-  const [profileOpen, setProfileOpen] = useState(false);
-  const [profile, setProfile] = useState(null);
-  const [savingProfile, setSavingProfile] = useState(false);
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  const [completedModuleIds, setCompletedModuleIds] = useState(new Set());
-
+  const authUser = session?.user;
   const countdown = useCountdown(
     eventInfo?.event_date || COURSE_INFO.eventDate
   );
-  const completedModules = completedModuleIds.size;
+
+  const completedCount = completedModuleIds.size;
   const progress =
     modules.length > 0
-      ? Math.round((completedModules / modules.length) * 100)
+      ? Math.round((completedCount / modules.length) * 100)
       : 0;
-  const progressStage = getProgressStage(progress);
+  const stage = getProgressStage(progress);
 
   const currentName =
     profile?.name ||
@@ -478,100 +704,144 @@ export default function App() {
     "Participante";
   const currentEmail = profile?.email || authUser?.email || "";
   const currentRole = profile?.role || "user";
-  const currentAvatar = profile?.avatar || initials(currentName);
-  const currentAvatarIsImage =
+  const currentAvatar = profile?.avatar || null;
+  const avatarIsImage =
     typeof currentAvatar === "string" && currentAvatar.startsWith("http");
 
-  const ensureParticipantProfile = async () => {
-    if (profile?.id) return profile;
-    if (!authUser?.id) return null;
+  // Map URL
+  const mapUrl =
+    eventInfo?.maps_link ||
+    (eventInfo?.address
+      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+          eventInfo.address
+        )}`
+      : `https://www.google.com/maps/search/?api=1&query=Hotel+Polana+Maputo`);
 
-    const { data, error } = await supabase
-      .from("participants")
-      .insert({
-        id: authUser.id,
-        name: currentName,
-        email: currentEmail,
-        avatar: currentAvatarIsImage ? currentAvatar : null,
-        progress: progress || 0,
-        role: currentRole || "user",
-      })
-      .select()
-      .single();
-
-    if (error) {
-      alert("Erro ao criar perfil: " + error.message);
-      return null;
-    }
-
-    setProfile(data);
-    return data;
-  };
-
-  const markModuleCompleted = async (module) => {
-    if (!module?.id) return;
-
-    const participant = await ensureParticipantProfile();
-    if (!participant?.id) return;
-
-    setCompletedModuleIds((prev) => {
-      const next = new Set(prev);
-      next.add(module.id);
-      return next;
+  // ── Auth listener ──
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setAuthLoading(false);
     });
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_, s) => {
+      setSession(s);
+      setAuthLoading(false);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
-    const { data: existing } = await supabase
-      .from("module_progress")
-      .select("id")
-      .eq("participant_id", participant.id)
-      .eq("module_id", module.id)
-      .maybeSingle();
-
-    if (existing?.id) {
-      await supabase
-        .from("module_progress")
-        .update({ completed: true, completed_at: new Date().toISOString() })
-        .eq("id", existing.id);
-    } else {
-      await supabase.from("module_progress").insert({
-        participant_id: participant.id,
-        module_id: module.id,
-        completed: true,
-        completed_at: new Date().toISOString(),
-      });
+  // ── Profile ──
+  useEffect(() => {
+    if (!authUser?.id) {
+      setProfile(null);
+      return;
     }
+    (async () => {
+      const { data, error } = await supabase
+        .from("participants")
+        .select("*")
+        .eq("id", authUser.id)
+        .maybeSingle();
+      if (!error && data) {
+        setProfile(data);
+        return;
+      }
+      const fallback =
+        authUser.user_metadata?.name ||
+        authUser.email?.split("@")[0] ||
+        "Participante";
+      const { data: created } = await supabase
+        .from("participants")
+        .insert({
+          id: authUser.id,
+          name: fallback,
+          email: authUser.email,
+          avatar: null,
+          progress: 0,
+          role: "user",
+        })
+        .select()
+        .single();
+      if (created) setProfile(created);
+      else
+        setProfile({
+          id: authUser.id,
+          name: fallback,
+          email: authUser.email,
+          avatar: null,
+          progress: 0,
+          role: "user",
+        });
+    })();
+  }, [authUser?.id]);
 
-    const nextCompleted = new Set(completedModuleIds);
-    nextCompleted.add(module.id);
-    const nextProgress =
-      modules.length > 0
-        ? Math.round((nextCompleted.size / modules.length) * 100)
-        : 0;
+  // ── Module progress ──
+  useEffect(() => {
+    if (!profile?.id) return;
+    (async () => {
+      const { data } = await supabase
+        .from("module_progress")
+        .select("module_id")
+        .eq("participant_id", profile.id)
+        .eq("completed", true);
+      if (data) setCompletedModuleIds(new Set(data.map((r) => r.module_id)));
+    })();
+  }, [profile?.id]);
 
-    await supabase
-      .from("participants")
-      .update({ progress: nextProgress })
-      .eq("id", participant.id);
+  // ── Modules ──
+  useEffect(() => {
+    (async () => {
+      setLoadingModules(true);
+      const { data } = await supabase
+        .from("modules")
+        .select("*")
+        .order("id", { ascending: true });
+      if (data) setModules(data);
+      setLoadingModules(false);
+    })();
+  }, []);
 
-    setProfile((prev) => ({ ...prev, progress: nextProgress }));
-  };
+  // ── Event data ──
+  useEffect(() => {
+    (async () => {
+      setLoadingEvent(true);
+      const [evRes, agRes, spRes] = await Promise.all([
+        supabase
+          .from("event_info")
+          .select("*")
+          .eq("active", true)
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from("agenda")
+          .select("*")
+          .eq("active", true)
+          .order("position", { ascending: true }),
+        supabase.from("speakers").select("*").order("id", { ascending: true }),
+      ]);
+      if (!evRes.error && evRes.data) setEventInfo(evRes.data);
+      if (!agRes.error && agRes.data) setAgenda(agRes.data);
+      if (!spRes.error && spRes.data) setSpeakers(spRes.data);
+      setLoadingEvent(false);
+    })();
+  }, []);
 
-  const fetchCommunityPosts = async () => {
+  // ── Community ──
+  const fetchPosts = useCallback(async () => {
     setLoadingCommunity(true);
-
-    const { data: rawPosts, error: postsError } = await supabase
+    const { data: rawPosts } = await supabase
       .from("community_posts")
       .select("*")
       .order("created_at", { ascending: false });
-
-    if (postsError) {
-      console.log("Erro community_posts:", postsError);
+    const postList = rawPosts || [];
+    if (postList.length === 0) {
       setPosts([]);
       setLoadingCommunity(false);
       return;
     }
 
-    const postList = rawPosts || [];
     const postIds = postList.map((p) => p.id);
     const replyIds = [
       ...new Set(postList.map((p) => p.reply_to).filter(Boolean)),
@@ -581,319 +851,228 @@ export default function App() {
       replyIds.length
         ? supabase.from("community_posts").select("*").in("id", replyIds)
         : Promise.resolve({ data: [] }),
-      postIds.length
-        ? supabase
-            .from("community_reactions")
-            .select("*")
-            .in("post_id", postIds)
-        : Promise.resolve({ data: [] }),
+      supabase.from("community_reactions").select("*").in("post_id", postIds),
     ]);
 
-    const participantIds = [
+    const pIds = [
       ...new Set(
         [...postList, ...(replyPosts || [])]
           .map((p) => p.participant_id)
           .filter(Boolean)
       ),
     ];
-
-    const { data: participants } = participantIds.length
+    const { data: participants } = pIds.length
       ? await supabase
           .from("participants")
           .select("id,name,email,avatar,role")
-          .in("id", participantIds)
+          .in("id", pIds)
       : { data: [] };
 
-    const participantMap = new Map((participants || []).map((p) => [p.id, p]));
-    const replyMap = new Map((replyPosts || []).map((p) => [p.id, p]));
-    const reactionsByPost = new Map();
-
-    (reactions || []).forEach((reaction) => {
-      const list = reactionsByPost.get(reaction.post_id) || [];
-      list.push(reaction);
-      reactionsByPost.set(reaction.post_id, list);
+    const pMap = new Map((participants || []).map((p) => [p.id, p]));
+    const rMap = new Map((replyPosts || []).map((p) => [p.id, p]));
+    const rxByPost = new Map();
+    (reactions || []).forEach((r) => {
+      const list = rxByPost.get(r.post_id) || [];
+      list.push(r);
+      rxByPost.set(r.post_id, list);
     });
 
     const merged = postList.map((post) => {
-      const author = participantMap.get(post.participant_id) || {};
-      const postReactions = reactionsByPost.get(post.id) || [];
-      const summary = postReactions.reduce((acc, reaction) => {
-        acc[reaction.emoji] = (acc[reaction.emoji] || 0) + 1;
+      const author = pMap.get(post.participant_id) || {};
+      const rx = rxByPost.get(post.id) || [];
+      const summary = rx.reduce((acc, r) => {
+        acc[r.emoji] = (acc[r.emoji] || 0) + 1;
         return acc;
       }, {});
       const myReaction = profile?.id
-        ? postReactions.find(
-            (reaction) => reaction.participant_id === profile.id
-          )
+        ? rx.find((r) => r.participant_id === profile.id)
         : null;
-      const repliedRaw = post.reply_to ? replyMap.get(post.reply_to) : null;
-      const repliedAuthor = repliedRaw
-        ? participantMap.get(repliedRaw.participant_id) || {}
-        : null;
-
+      const repliedRaw = post.reply_to ? rMap.get(post.reply_to) : null;
       return {
         ...post,
         author,
-        reactions: postReactions,
+        reactions: rx,
         reactionSummary: summary,
         myReaction,
         repliedPost: repliedRaw
-          ? {
-              ...repliedRaw,
-              author: repliedAuthor,
-            }
+          ? { ...repliedRaw, author: pMap.get(repliedRaw.participant_id) || {} }
           : null,
       };
     });
-
     setPosts(merged);
     setLoadingCommunity(false);
+  }, [profile?.id]);
+
+  useEffect(() => {
+    fetchPosts();
+  }, [profile?.id]);
+
+  // ── Helpers ──
+  const ensureProfile = async () => {
+    if (profile?.id) return profile;
+    if (!authUser?.id) return null;
+    const { data } = await supabase
+      .from("participants")
+      .insert({
+        id: authUser.id,
+        name: currentName,
+        email: currentEmail,
+        avatar: null,
+        progress: 0,
+        role: "user",
+      })
+      .select()
+      .single();
+    if (data) {
+      setProfile(data);
+      return data;
+    }
+    return null;
   };
 
-  const scrollToPost = (postId) => {
-    const el = document.getElementById(`post-${postId}`);
-    if (!el) {
-      alert("A mensagem original não está visível neste momento.");
-      return;
-    }
-
-    el.scrollIntoView({ behavior: "smooth", block: "center" });
-    el.style.boxShadow = `0 0 0 2px ${C.gold}, 0 0 36px rgba(201,168,76,0.28)`;
-    setTimeout(() => {
-      el.style.boxShadow = "";
-    }, 1600);
+  const markModuleDone = async (mod) => {
+    if (!mod?.id) return;
+    const p = await ensureProfile();
+    if (!p?.id) return;
+    setCompletedModuleIds((prev) => new Set([...prev, mod.id]));
+    const { data: ex } = await supabase
+      .from("module_progress")
+      .select("id")
+      .eq("participant_id", p.id)
+      .eq("module_id", mod.id)
+      .maybeSingle();
+    if (ex?.id)
+      await supabase
+        .from("module_progress")
+        .update({ completed: true, completed_at: new Date().toISOString() })
+        .eq("id", ex.id);
+    else
+      await supabase
+        .from("module_progress")
+        .insert({
+          participant_id: p.id,
+          module_id: mod.id,
+          completed: true,
+          completed_at: new Date().toISOString(),
+        });
+    const next = completedModuleIds.size + 1;
+    const nextP =
+      modules.length > 0 ? Math.round((next / modules.length) * 100) : 0;
+    await supabase
+      .from("participants")
+      .update({ progress: nextP })
+      .eq("id", p.id);
+    setProfile((prev) => ({ ...prev, progress: nextP }));
   };
 
   const reactToPost = async (postId, emoji) => {
-    const participant = await ensureParticipantProfile();
-    if (!participant?.id) return;
-
-    const { data: existing } = await supabase
+    const p = await ensureProfile();
+    if (!p?.id) return;
+    const { data: ex } = await supabase
       .from("community_reactions")
-      .select("id, emoji")
+      .select("id,emoji")
       .eq("post_id", postId)
-      .eq("participant_id", participant.id)
+      .eq("participant_id", p.id)
       .maybeSingle();
-
-    if (existing?.id && existing.emoji === emoji) {
-      await supabase.from("community_reactions").delete().eq("id", existing.id);
-    } else if (existing?.id) {
+    if (ex?.id && ex.emoji === emoji)
+      await supabase.from("community_reactions").delete().eq("id", ex.id);
+    else if (ex?.id)
       await supabase
         .from("community_reactions")
         .update({ emoji })
-        .eq("id", existing.id);
-    } else {
-      await supabase.from("community_reactions").insert({
-        post_id: postId,
-        participant_id: participant.id,
-        emoji,
-      });
-    }
-
+        .eq("id", ex.id);
+    else
+      await supabase
+        .from("community_reactions")
+        .insert({ post_id: postId, participant_id: p.id, emoji });
     setReactionPickerFor(null);
-    fetchCommunityPosts();
-  };
-
-  // Fetch profile
-  useEffect(() => {
-    if (!authUser?.id) {
-      setProfile(null);
-      return;
-    }
-
-    (async () => {
-      const { data, error } = await supabase
-        .from("participants")
-        .select("*")
-        .eq("id", authUser.id)
-        .maybeSingle();
-
-      if (!error && data) {
-        setProfile(data);
-        return;
-      }
-
-      const fallbackName =
-        authUser.user_metadata?.name ||
-        authUser.email?.split("@")[0] ||
-        "Participante";
-
-      const { data: created, error: createError } = await supabase
-        .from("participants")
-        .insert({
-          id: authUser.id,
-          name: fallbackName,
-          email: authUser.email,
-          avatar: null,
-          progress: 0,
-          role: "user",
-        })
-        .select()
-        .single();
-
-      if (!createError && created) {
-        setProfile(created);
-      } else {
-        setProfile({
-          id: authUser.id,
-          name: fallbackName,
-          email: authUser.email,
-          avatar: null,
-          progress: 0,
-          role: "user",
-        });
-      }
-
-      if (error) console.log("Erro participants:", error);
-      if (createError) console.log("Erro ao criar participant:", createError);
-    })();
-  }, [authUser?.id]);
-
-  // Fetch module progress for current participant
-  useEffect(() => {
-    if (!profile?.id) return;
-
-    (async () => {
-      const { data, error } = await supabase
-        .from("module_progress")
-        .select("module_id, completed")
-        .eq("participant_id", profile.id)
-        .eq("completed", true);
-
-      if (!error && data) {
-        setCompletedModuleIds(new Set(data.map((row) => row.module_id)));
-      }
-
-      if (error) console.log("Erro module_progress:", error);
-    })();
-  }, [profile?.id]);
-
-  // Fetch community posts
-  useEffect(() => {
-    fetchCommunityPosts();
-  }, [profile?.id]);
-
-  // Fetch modules
-  useEffect(() => {
-    (async () => {
-      setLoadMod(true);
-      const { data, error } = await supabase
-        .from("modules")
-        .select("*")
-        .order("id", { ascending: true });
-      if (!error) setModules(data || []);
-      setLoadMod(false);
-    })();
-  }, []);
-
-  // Fetch event data
-  // Tabelas Supabase usadas:
-  //   event_info  → title, venue, address, maps_link, event_month, event_date, description, active
-  //   agenda      → time, title, type, active, position
-  //   speakers    → name, role, topic, avatar, color
-  useEffect(() => {
-    (async () => {
-      setLoadEvent(true);
-
-      const [evRes, agRes, spRes] = await Promise.all([
-        supabase
-          .from("event_info")
-          .select("*")
-          .eq("active", true)
-          .limit(1)
-          .maybeSingle(),
-
-        supabase
-          .from("agenda")
-          .select("*")
-          .eq("active", true)
-          .order("position", { ascending: true }),
-
-        supabase.from("speakers").select("*").order("id", { ascending: true }),
-      ]);
-
-      if (!evRes.error && evRes.data) setEventInfo(evRes.data);
-      if (!agRes.error && agRes.data) setAgenda(agRes.data);
-      if (!spRes.error && spRes.data) setSpeakers(spRes.data);
-
-      if (evRes.error) console.log("Erro event_info:", evRes.error);
-      if (agRes.error) console.log("Erro agenda:", agRes.error);
-      if (spRes.error) console.log("Erro speakers:", spRes.error);
-
-      setLoadEvent(false);
-    })();
-  }, []);
-
-  // Map URL — usa maps_link do Supabase ou faz fallback pelo endereço
-  const mapUrl =
-    eventInfo?.maps_link ||
-    (eventInfo?.address
-      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-          eventInfo.address
-        )}`
-      : `https://www.google.com/maps/search/?api=1&query=Hotel+Polana+Maputo`);
-
-  const toggleLike = (id) => {
-    setLiked((p) => ({ ...p, [id]: !p[id] }));
-    setPosts((p) =>
-      p.map((post) =>
-        post.id === id
-          ? { ...post, likes: post.likes + (liked[id] ? -1 : 1) }
-          : post
-      )
-    );
+    fetchPosts();
   };
 
   const sendMsg = async () => {
     if (!newMsg.trim()) return;
-
-    const participant = await ensureParticipantProfile();
-    if (!participant?.id) return;
-
-    const { error } = await supabase.from("community_posts").insert({
-      participant_id: participant.id,
-      message: newMsg.trim(),
-      reply_to: replyingTo?.id || null,
-    });
-
-    if (error) {
-      alert("Erro ao publicar: " + error.message);
-      return;
-    }
-
+    const p = await ensureProfile();
+    if (!p?.id) return;
+    await supabase
+      .from("community_posts")
+      .insert({
+        participant_id: p.id,
+        message: newMsg.trim(),
+        reply_to: replyingTo?.id || null,
+      });
     setNewMsg("");
     setReplyingTo(null);
-    fetchCommunityPosts();
+    fetchPosts();
+  };
+
+  const scrollToPost = (id) => {
+    const el = document.getElementById(`post-${id}`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.style.boxShadow = `0 0 0 2px ${C.gold}, 0 0 48px rgba(201,168,76,0.22)`;
+    setTimeout(() => {
+      el.style.boxShadow = "";
+    }, 1800);
   };
 
   const handlePhotoUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file || !profile) return;
-
     setUploadingPhoto(true);
-
-    const fileExt = file.name.split(".").pop();
-    const safeEmail = currentEmail.replace(/[^a-zA-Z0-9]/g, "-");
-    const filePath = `${safeEmail}/${Date.now()}.${fileExt}`;
-
-    const { error: uploadError } = await supabase.storage
+    const ext = file.name.split(".").pop();
+    const path = `${currentEmail.replace(
+      /[^a-zA-Z0-9]/g,
+      "-"
+    )}/${Date.now()}.${ext}`;
+    const { error } = await supabase.storage
       .from("profile-photos")
-      .upload(filePath, file, { upsert: true });
-
-    if (uploadError) {
-      alert("Erro ao carregar foto: " + uploadError.message);
+      .upload(path, file, { upsert: true });
+    if (error) {
+      alert("Erro ao carregar foto: " + error.message);
       setUploadingPhoto(false);
       return;
     }
-
-    const { data: publicData } = supabase.storage
-      .from("profile-photos")
-      .getPublicUrl(filePath);
-
-    const publicUrl = publicData?.publicUrl;
-
-    setProfile((prev) => ({ ...prev, avatar: publicUrl }));
+    const { data } = supabase.storage.from("profile-photos").getPublicUrl(path);
+    setProfile((prev) => ({ ...prev, avatar: data?.publicUrl }));
     setUploadingPhoto(false);
+  };
+
+  const saveProfile = async () => {
+    if (!profile?.name?.trim()) {
+      alert("O nome não pode ficar vazio.");
+      return;
+    }
+    setSavingProfile(true);
+    const payload = {
+      name: profile.name.trim(),
+      avatar: profile.avatar || null,
+    };
+    const result = profile.id
+      ? await supabase
+          .from("participants")
+          .update(payload)
+          .eq("id", profile.id)
+          .select()
+          .single()
+      : await supabase
+          .from("participants")
+          .insert({
+            id: authUser?.id,
+            ...payload,
+            email: currentEmail,
+            progress: profile.progress || 0,
+            role: profile.role || "user",
+          })
+          .select()
+          .single();
+    if (result.error) {
+      alert("Erro ao guardar: " + result.error.message);
+      setSavingProfile(false);
+      return;
+    }
+    setProfile(result.data);
+    setSavingProfile(false);
+    setProfileOpen(false);
   };
 
   const signOut = async () => {
@@ -904,73 +1083,46 @@ export default function App() {
     setProfileOpen(false);
   };
 
-  const saveProfile = async () => {
-    if (!profile?.name?.trim()) {
-      alert("O nome não pode ficar vazio.");
-      return;
-    }
-
-    setSavingProfile(true);
-
-    const payload = {
-      name: profile.name.trim(),
-      avatar: profile.avatar || null,
-    };
-
-    let result;
-
-    if (profile.id) {
-      result = await supabase
-        .from("participants")
-        .update(payload)
-        .eq("id", profile.id)
-        .select()
-        .single();
-    } else {
-      result = await supabase
-        .from("participants")
-        .insert({
-          id: authUser?.id,
-          ...payload,
-          email: currentEmail,
-          progress: profile.progress || 0,
-          role: profile.role || "user",
-        })
-        .select()
-        .single();
-    }
-
-    if (result.error) {
-      alert("Erro ao guardar perfil: " + result.error.message);
-      setSavingProfile(false);
-      return;
-    }
-
-    setProfile(result.data);
-    setSavingProfile(false);
-    setProfileOpen(false);
+  const navigateTo = (id) => {
+    prevTab.current = tab;
+    setTab(id);
   };
 
+  // ── Render guards ──
   if (authLoading) {
     return (
       <div
         style={{
           minHeight: "100vh",
           background: C.obsidian,
-          color: C.gold,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           fontFamily: "DM Sans",
+          color: C.gold,
+          fontSize: 13,
+          letterSpacing: 2,
         }}
       >
-        A carregar Acelera...
+        <style>{GLOBAL_CSS}</style>
+        <div
+          style={{
+            animation: "spin 1s linear infinite",
+            width: 24,
+            height: 24,
+            border: `2px solid ${C.goldFaint}`,
+            borderTopColor: C.gold,
+            borderRadius: "50%",
+            marginRight: 12,
+          }}
+        />
+        A carregar Acelera…
       </div>
     );
   }
-
   if (!session) return <AuthScreen />;
 
+  // ─────────────────────────────────────────────────────────────────────────────
   return (
     <div
       style={{
@@ -983,75 +1135,21 @@ export default function App() {
         position: "relative",
       }}
     >
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=DM+Sans:wght@300;400;500;600&display=swap');
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background: #07070E; }
-        .dsp { font-family: 'Cormorant Garamond', Georgia, serif; }
-        .sans { font-family: 'DM Sans', sans-serif; }
-        ::-webkit-scrollbar { width: 0; }
-
-        .tab-in { animation: tabIn 0.4s cubic-bezier(0.22,1,0.36,1); }
-        @keyframes tabIn { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
-
-        .stagger > * { opacity:0; animation: tabIn 0.4s cubic-bezier(0.22,1,0.36,1) forwards; }
-        .stagger > *:nth-child(1){animation-delay:.05s}
-        .stagger > *:nth-child(2){animation-delay:.10s}
-        .stagger > *:nth-child(3){animation-delay:.15s}
-        .stagger > *:nth-child(4){animation-delay:.20s}
-        .stagger > *:nth-child(5){animation-delay:.25s}
-        .stagger > *:nth-child(6){animation-delay:.30s}
-        .stagger > *:nth-child(7){animation-delay:.35s}
-        .stagger > *:nth-child(8){animation-delay:.40s}
-
-        @keyframes skelShimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
-
-        .shimmer-ov {
-          background: linear-gradient(105deg, transparent 35%, rgba(201,168,76,0.07) 50%, transparent 65%);
-          background-size: 200% 100%;
-          animation: shOv 3.5s infinite;
-        }
-        @keyframes shOv { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
-
-        .dot-bg {
-          background-image: radial-gradient(circle, rgba(201,168,76,0.055) 1px, transparent 1px);
-          background-size: 18px 18px;
-        }
-
-        .pulse { animation: pulse 2.6s ease-in-out infinite; }
-        @keyframes pulse { 0%,100%{box-shadow:0 0 0 0 rgba(201,168,76,0.5)} 55%{box-shadow:0 0 0 9px rgba(201,168,76,0)} }
-
-        .press { transition: transform 0.18s; cursor: pointer; }
-        .press:active { transform: scale(0.975); }
-
-        .nav-btn { transition: all 0.2s; }
-        .nav-btn:hover { background: rgba(201,168,76,0.07) !important; }
-
-        .map-btn { transition: all 0.22s; }
-        .map-btn:hover { background: rgba(93,86,232,0.28) !important; transform: translateY(-1px); }
-        .map-btn:active { transform: scale(0.97); }
-
-        textarea:focus { border-color: rgba(201,168,76,0.45) !important; outline: none; }
-        input:focus { border-color: rgba(201,168,76,0.45) !important; outline: none; }
-        .community-post { transition: box-shadow 0.35s, transform 0.18s; }
-        .community-post:hover { transform: translateY(-1px); }
-        .emoji-pill { transition: all 0.18s; }
-        .emoji-pill:hover { transform: translateY(-2px) scale(1.05); }
-      `}</style>
+      <style>{GLOBAL_CSS}</style>
 
       {/* ── HEADER ─────────────────────────────────────────────────────────── */}
       <header
+        className="glass"
         style={{
-          background: `linear-gradient(180deg, #0D0D1A 0%, rgba(13,13,26,0.96) 100%)`,
-          backdropFilter: "blur(28px)",
-          WebkitBackdropFilter: "blur(28px)",
-          padding: "0 18px",
+          padding: "0 20px",
           position: "sticky",
           top: 0,
           zIndex: 100,
           borderBottom: `1px solid ${C.border}`,
+          boxShadow: "0 4px 30px rgba(0,0,0,0.4)",
         }}
       >
+        {/* Top bar */}
         <div
           style={{
             display: "flex",
@@ -1060,7 +1158,6 @@ export default function App() {
             padding: "16px 0 12px",
           }}
         >
-          {/* Logo */}
           <img
             src={LOGO_URL}
             alt="Acelera"
@@ -1068,17 +1165,15 @@ export default function App() {
               width: 130,
               height: 40,
               objectFit: "contain",
-              filter: "drop-shadow(0 0 14px rgba(201,168,76,0.2))",
+              filter: "drop-shadow(0 0 16px rgba(201,168,76,0.28))",
             }}
           />
-
-          {/* Course label */}
           <div style={{ flex: 1, textAlign: "center" }}>
             <div
               className="sans"
               style={{
                 fontSize: 8,
-                letterSpacing: 3,
+                letterSpacing: 3.5,
                 color: C.gold,
                 textTransform: "uppercase",
               }}
@@ -1088,18 +1183,18 @@ export default function App() {
             <div
               className="dsp"
               style={{
-                fontSize: 12.5,
+                fontSize: 12,
                 fontWeight: 600,
                 color: C.offwhite,
                 lineHeight: 1.3,
+                marginTop: 2,
               }}
             >
               {COURSE_INFO.course}{" "}
               <span style={{ color: C.gold }}>{COURSE_INFO.edition}</span>
             </div>
           </div>
-
-          {/* Avatar */}
+          {/* Avatar btn */}
           <button
             className="pulse press"
             onClick={() => setProfileOpen(true)}
@@ -1108,26 +1203,28 @@ export default function App() {
               height: 40,
               borderRadius: "50%",
               flexShrink: 0,
-              background: currentAvatarIsImage
+              border: "1.5px solid rgba(201,168,76,0.35)",
+              cursor: "pointer",
+              padding: 0,
+              overflow: "hidden",
+              background: avatarIsImage
                 ? `url(${currentAvatar}) center/cover`
                 : `linear-gradient(135deg, ${C.gold}, ${C.goldDim})`,
-              border: "none",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               fontFamily: "DM Sans",
-              fontWeight: 700,
+              fontWeight: 800,
               fontSize: 13,
               color: C.obsidian,
             }}
-            title="Abrir perfil"
           >
-            {!currentAvatarIsImage && currentAvatar}
+            {!avatarIsImage && initials(currentName)}
           </button>
         </div>
 
         {/* Nav */}
-        <nav style={{ display: "flex", gap: 2, paddingBottom: 10 }}>
+        <nav style={{ display: "flex", gap: 4, paddingBottom: 12 }}>
           {[
             { id: "home", icon: "✦", label: "Início" },
             { id: "content", icon: "▶", label: "Conteúdo" },
@@ -1138,42 +1235,55 @@ export default function App() {
             return (
               <button
                 key={t.id}
-                className="nav-btn"
-                onClick={() => setTab(t.id)}
+                onClick={() => navigateTo(t.id)}
+                className={`nav-pill${active ? " active" : ""} sans`}
                 style={{
                   flex: 1,
-                  background: active ? C.goldGlow : "transparent",
                   border: active
-                    ? `1px solid rgba(201,168,76,0.28)`
-                    : "1px solid transparent",
-                  borderRadius: 8,
-                  padding: "6px 2px",
+                    ? `1px solid rgba(201,168,76,0.35)`
+                    : `1px solid transparent`,
+                  borderRadius: 10,
+                  padding: "6px 4px",
                   cursor: "pointer",
+                  background: active ? "rgba(201,168,76,0.12)" : "transparent",
                   color: active ? C.gold : C.muted,
                   fontSize: 9,
-                  fontFamily: "DM Sans",
-                  fontWeight: 500,
+                  fontWeight: 600,
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
                   gap: 3,
+                  transition: "all .22s cubic-bezier(0.22,1,0.36,1)",
                 }}
               >
-                <span style={{ fontSize: 13 }}>{t.icon}</span>
+                <span style={{ fontSize: 14 }}>{t.icon}</span>
                 {t.label}
+                {active && (
+                  <span
+                    style={{
+                      display: "block",
+                      width: 14,
+                      height: 2,
+                      borderRadius: 1,
+                      background: C.gold,
+                      marginTop: 1,
+                      boxShadow: `0 0 6px ${C.gold}`,
+                    }}
+                  />
+                )}
               </button>
             );
           })}
         </nav>
       </header>
 
-      {/* ── MAIN CONTENT ───────────────────────────────────────────────────── */}
-      <main style={{ padding: "0 18px 120px" }}>
-        {/* ══════════════════ HOME ══════════════════════════════════════════ */}
+      {/* ── MAIN ───────────────────────────────────────────────────────────── */}
+      <main style={{ padding: "0 20px 140px" }}>
+        {/* ══════════ HOME ══════════════════════════════════════════════════ */}
         {tab === "home" && (
-          <div className="tab-in stagger">
+          <div className="stagger">
             {/* Welcome */}
-            <div style={{ padding: "28px 0 22px" }}>
+            <div style={{ padding: "30px 0 24px" }}>
               <div
                 className="sans"
                 style={{ fontSize: 11, color: C.muted, letterSpacing: 1 }}
@@ -1183,10 +1293,11 @@ export default function App() {
               <div
                 className="dsp"
                 style={{
-                  fontSize: 42,
+                  fontSize: 48,
                   fontWeight: 700,
-                  lineHeight: 1,
-                  marginTop: 4,
+                  lineHeight: 0.95,
+                  marginTop: 6,
+                  letterSpacing: -1,
                 }}
               >
                 {currentName.split(" ")[0]}
@@ -1197,8 +1308,8 @@ export default function App() {
                 style={{
                   fontSize: 13,
                   color: C.muted,
-                  marginTop: 8,
-                  lineHeight: 1.65,
+                  marginTop: 10,
+                  lineHeight: 1.7,
                 }}
               >
                 A tua jornada de carreira começa aqui,
@@ -1207,24 +1318,32 @@ export default function App() {
               </div>
             </div>
 
-            {/* Countdown hero */}
+            {/* Countdown */}
             <div
-              className="press"
               style={{
-                background: `linear-gradient(135deg, #18152E 0%, #0E0D1C 55%, #0A0C1A 100%)`,
-                border: `1px solid rgba(201,168,76,0.22)`,
-                borderRadius: 22,
-                padding: "22px 20px",
-                marginBottom: 20,
                 position: "relative",
                 overflow: "hidden",
+                borderRadius: 24,
+                border: `1px solid rgba(201,168,76,0.2)`,
+                background:
+                  "linear-gradient(145deg, #15122D 0%, #0D0C1E 60%, #0A0C1A 100%)",
+                padding: "24px 22px",
+                marginBottom: 20,
                 boxShadow:
-                  "0 0 0 1px rgba(201,168,76,0.1), 0 12px 48px rgba(201,168,76,0.07)",
+                  "0 0 0 1px rgba(201,168,76,0.07), 0 16px 56px rgba(0,0,0,0.5)",
               }}
             >
+              <OrbBg />
+              {/* Dot grid */}
               <div
-                className="shimmer-ov dot-bg"
-                style={{ position: "absolute", inset: 0, borderRadius: 22 }}
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  backgroundImage:
+                    "radial-gradient(rgba(201,168,76,0.05) 1px, transparent 1px)",
+                  backgroundSize: "18px 18px",
+                  borderRadius: "inherit",
+                }}
               />
               <div style={{ position: "relative", zIndex: 1 }}>
                 <div
@@ -1232,7 +1351,7 @@ export default function App() {
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "flex-start",
-                    marginBottom: 18,
+                    marginBottom: 20,
                   }}
                 >
                   <div>
@@ -1240,7 +1359,7 @@ export default function App() {
                       className="sans"
                       style={{
                         fontSize: 8,
-                        letterSpacing: 3,
+                        letterSpacing: 3.5,
                         color: C.gold,
                         textTransform: "uppercase",
                       }}
@@ -1250,28 +1369,16 @@ export default function App() {
                     <div
                       className="dsp"
                       style={{
-                        fontSize: 18,
+                        fontSize: 20,
                         color: C.offwhite,
-                        marginTop: 3,
+                        marginTop: 4,
                         fontStyle: "italic",
                       }}
                     >
                       {eventInfo?.event_month || COURSE_INFO.eventMonthLabel}
                     </div>
                   </div>
-                  <div
-                    style={{
-                      background: "rgba(201,168,76,0.1)",
-                      border: `1px solid rgba(201,168,76,0.22)`,
-                      borderRadius: 8,
-                      padding: "4px 12px",
-                      fontFamily: "DM Sans",
-                      fontSize: 10,
-                      color: C.gold,
-                    }}
-                  >
-                    data provisória
-                  </div>
+                  <Badge>data provisória</Badge>
                 </div>
 
                 <div
@@ -1290,20 +1397,23 @@ export default function App() {
                     <div
                       key={k}
                       style={{
-                        background: "rgba(7,7,14,0.65)",
-                        borderRadius: 14,
+                        background: "rgba(5,5,15,0.7)",
+                        borderRadius: 16,
                         border: `1px solid rgba(201,168,76,0.1)`,
                         padding: "14px 4px",
                         textAlign: "center",
+                        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
                       }}
                     >
                       <div
+                        key={countdown[k]}
                         className="dsp"
                         style={{
-                          fontSize: 36,
+                          fontSize: 40,
                           fontWeight: 700,
                           color: C.gold,
                           lineHeight: 1,
+                          animation: "countUp .35s cubic-bezier(0.22,1,0.36,1)",
                         }}
                       >
                         {String(countdown[k]).padStart(2, "0")}
@@ -1314,7 +1424,7 @@ export default function App() {
                           fontSize: 8,
                           color: C.muted,
                           textTransform: "uppercase",
-                          letterSpacing: 1.5,
+                          letterSpacing: 2,
                           marginTop: 5,
                         }}
                       >
@@ -1330,9 +1440,13 @@ export default function App() {
                     alignItems: "center",
                     gap: 6,
                     marginTop: 16,
+                    padding: "10px 12px",
+                    background: "rgba(255,255,255,0.025)",
+                    borderRadius: 12,
+                    border: `1px solid ${C.border}`,
                   }}
                 >
-                  <span style={{ fontSize: 12 }}>📍</span>
+                  <span style={{ fontSize: 13 }}>📍</span>
                   <span
                     className="sans"
                     style={{ fontSize: 11, color: C.muted }}
@@ -1348,111 +1462,128 @@ export default function App() {
               style={{
                 background: C.card,
                 border: `1px solid ${C.border}`,
-                borderRadius: 18,
-                padding: "18px 20px",
+                borderRadius: 22,
+                padding: "22px 20px",
                 marginBottom: 20,
+                position: "relative",
+                overflow: "hidden",
               }}
             >
               <div
                 style={{
                   display: "flex",
                   justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: 14,
+                  alignItems: "flex-start",
+                  marginBottom: 16,
                 }}
               >
                 <div>
                   <div
                     className="sans"
-                    style={{ fontSize: 13, fontWeight: 600, color: C.white }}
+                    style={{ fontSize: 14, fontWeight: 600, color: C.white }}
                   >
                     Preparação Pré-Evento
                   </div>
                   <div
                     className="sans"
-                    style={{ fontSize: 11, color: C.muted, marginTop: 3 }}
+                    style={{ fontSize: 11, color: C.muted, marginTop: 4 }}
                   >
-                    {completedModules} de {modules.length} módulos concluídos
+                    {completedCount} de {modules.length} módulos concluídos
                   </div>
                 </div>
-                <div
-                  className="dsp"
-                  style={{
-                    fontSize: 40,
-                    fontWeight: 700,
-                    color: C.gold,
-                    lineHeight: 1,
-                  }}
-                >
-                  {progress}
-                  <span style={{ fontSize: 18, color: C.goldDim }}>%</span>
+                <div style={{ textAlign: "right" }}>
+                  <div
+                    className="dsp"
+                    style={{
+                      fontSize: 44,
+                      fontWeight: 700,
+                      color: C.gold,
+                      lineHeight: 1,
+                    }}
+                  >
+                    {progress}
+                    <span style={{ fontSize: 18, color: C.goldDim }}>%</span>
+                  </div>
                 </div>
               </div>
+
+              {/* Progress bar */}
               <div
                 style={{
-                  background: "rgba(255,255,255,0.05)",
+                  background: "rgba(255,255,255,0.04)",
                   borderRadius: 99,
-                  height: 4,
+                  height: 5,
+                  overflow: "hidden",
                 }}
               >
                 <div
                   style={{
-                    width: `${progress}%`,
                     height: "100%",
-                    background: `linear-gradient(90deg, ${C.goldDim}, ${C.gold}, ${C.goldLight})`,
                     borderRadius: 99,
-                    transition: "width 1.4s cubic-bezier(0.22,1,0.36,1)",
-                    boxShadow: `0 0 8px ${C.gold}55`,
+                    background: `linear-gradient(90deg, ${C.goldDim}, ${C.gold} 60%, ${C.goldLight})`,
+                    width: `${progress}%`,
+                    transition: "width 1.6s cubic-bezier(0.22,1,0.36,1)",
+                    boxShadow: `0 0 12px ${C.gold}66`,
+                    position: "relative",
+                    overflow: "hidden",
                   }}
-                />
+                >
+                  <div
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      background:
+                        "linear-gradient(90deg,transparent 0%,rgba(255,255,255,0.2) 50%,transparent 100%)",
+                      backgroundSize: "200% 100%",
+                      animation: "shimmer 2s infinite",
+                    }}
+                  />
+                </div>
               </div>
+
               <div
                 style={{
-                  marginTop: 14,
-                  background: "rgba(201,168,76,0.06)",
+                  marginTop: 16,
+                  background: `linear-gradient(135deg, rgba(201,168,76,0.07), rgba(201,168,76,0.03))`,
                   border: `1px solid ${C.borderGold}`,
-                  borderRadius: 12,
-                  padding: "12px 14px",
+                  borderRadius: 14,
+                  padding: "14px 16px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
                 }}
               >
-                <div
-                  className="sans"
-                  style={{ fontSize: 10, color: C.muted, marginBottom: 4 }}
-                >
-                  Nível da jornada
-                </div>
-                <div
-                  className="dsp"
-                  style={{ fontSize: 24, color: C.gold, fontWeight: 700 }}
-                >
-                  {progressStage}
+                <span style={{ fontSize: 20 }}>{stage.icon}</span>
+                <div>
+                  <div
+                    className="sans"
+                    style={{ fontSize: 10, color: C.muted }}
+                  >
+                    Nível da jornada
+                  </div>
+                  <div
+                    className="dsp"
+                    style={{ fontSize: 22, color: C.gold, fontWeight: 700 }}
+                  >
+                    {stage.label}
+                  </div>
                 </div>
               </div>
+
               {progress < 100 && (
                 <div
                   className="sans"
-                  style={{ fontSize: 11, color: C.muted, marginTop: 10 }}
+                  style={{ fontSize: 11, color: C.muted, marginTop: 12 }}
                 >
-                  🔥 Continua — estás no bom caminho!
+                  🔥 Continua — estás no bom caminho para o evento!
                 </div>
               )}
             </div>
 
-            {/* Speakers — só mostra se vier do Supabase */}
+            {/* Speakers preview */}
             {speakers.length > 0 && (
               <>
-                <div
-                  className="sans"
-                  style={{
-                    fontSize: 9,
-                    letterSpacing: 3,
-                    color: C.muted,
-                    textTransform: "uppercase",
-                    marginBottom: 12,
-                  }}
-                >
-                  Quem vais encontrar
-                </div>
+                <SectionLabel>Quem vais encontrar</SectionLabel>
                 <div
                   style={{
                     display: "flex",
@@ -1464,12 +1595,12 @@ export default function App() {
                   {speakers.map((s, i) => (
                     <div
                       key={i}
-                      className="press"
+                      className="card-hover press"
                       style={{
                         background: C.card,
                         border: `1px solid ${C.border}`,
-                        borderRadius: 14,
-                        padding: "14px 16px",
+                        borderRadius: 16,
+                        padding: "16px 18px",
                         display: "flex",
                         alignItems: "center",
                         gap: 14,
@@ -1477,17 +1608,17 @@ export default function App() {
                     >
                       <div
                         style={{
-                          width: 50,
-                          height: 50,
+                          width: 52,
+                          height: 52,
                           borderRadius: "50%",
                           flexShrink: 0,
-                          background: `${s.color || C.gold}16`,
-                          border: `2px solid ${s.color || C.gold}30`,
+                          background: `${s.color || C.gold}14`,
+                          border: `2px solid ${s.color || C.gold}2C`,
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
                           fontFamily: "DM Sans",
-                          fontWeight: 700,
+                          fontWeight: 800,
                           fontSize: 15,
                           color: s.color || C.gold,
                         }}
@@ -1499,7 +1630,7 @@ export default function App() {
                             .join("")
                             .slice(0, 2)}
                       </div>
-                      <div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
                         <div
                           className="sans"
                           style={{
@@ -1512,7 +1643,7 @@ export default function App() {
                         </div>
                         <div
                           className="sans"
-                          style={{ fontSize: 11, color: C.muted }}
+                          style={{ fontSize: 11, color: C.muted, marginTop: 2 }}
                         >
                           {s.role}
                         </div>
@@ -1523,13 +1654,14 @@ export default function App() {
                               fontSize: 13,
                               fontStyle: "italic",
                               color: s.color || C.gold,
-                              marginTop: 3,
+                              marginTop: 4,
                             }}
                           >
                             "{s.topic}"
                           </div>
                         )}
                       </div>
+                      <div style={{ color: C.faint, fontSize: 16 }}>›</div>
                     </div>
                   ))}
                 </div>
@@ -1539,21 +1671,22 @@ export default function App() {
             {/* Quote */}
             <div
               style={{
-                background: `linear-gradient(135deg, rgba(201,168,76,0.07) 0%, rgba(93,86,232,0.04) 100%)`,
-                border: `1px solid rgba(201,168,76,0.14)`,
-                borderRadius: 22,
-                padding: "32px 26px",
-                textAlign: "center",
                 position: "relative",
                 overflow: "hidden",
+                background: `linear-gradient(135deg, rgba(201,168,76,0.06), rgba(107,95,234,0.04))`,
+                border: `1px solid rgba(201,168,76,0.12)`,
+                borderRadius: 24,
+                padding: "36px 28px",
+                textAlign: "center",
+                boxShadow: "0 16px 60px rgba(0,0,0,0.3)",
               }}
             >
               <div
                 style={{
                   position: "absolute",
-                  top: -20,
+                  top: -30,
                   right: -10,
-                  fontSize: 140,
+                  fontSize: 180,
                   color: "rgba(201,168,76,0.04)",
                   fontFamily: "Cormorant Garamond",
                   lineHeight: 1,
@@ -1566,10 +1699,10 @@ export default function App() {
               <div
                 className="dsp"
                 style={{
-                  fontSize: 21,
+                  fontSize: 22,
                   fontStyle: "italic",
                   color: C.white,
-                  lineHeight: 1.65,
+                  lineHeight: 1.7,
                   position: "relative",
                   zIndex: 1,
                 }}
@@ -1579,35 +1712,35 @@ export default function App() {
               </div>
               <div
                 style={{
-                  marginTop: 18,
+                  marginTop: 20,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  gap: 10,
+                  gap: 12,
                 }}
               >
                 <div
                   style={{
                     height: 1,
-                    width: 28,
+                    width: 32,
                     background: `rgba(201,168,76,0.3)`,
                   }}
                 />
-                <div
+                <span
                   className="sans"
                   style={{
                     fontSize: 9,
-                    letterSpacing: 2.5,
+                    letterSpacing: 3,
                     color: C.gold,
                     textTransform: "uppercase",
                   }}
                 >
                   Acelera 4.0
-                </div>
+                </span>
                 <div
                   style={{
                     height: 1,
-                    width: 28,
+                    width: 32,
                     background: `rgba(201,168,76,0.3)`,
                   }}
                 />
@@ -1616,26 +1749,26 @@ export default function App() {
           </div>
         )}
 
-        {/* ══════════════════ CONTENT ═══════════════════════════════════════ */}
+        {/* ══════════ CONTENT ═══════════════════════════════════════════════ */}
         {tab === "content" && (
-          <div className="tab-in">
-            <div style={{ padding: "28px 0 20px" }}>
+          <div className="fade-in">
+            <div style={{ padding: "30px 0 22px" }}>
               <div
                 className="dsp"
-                style={{ fontSize: 34, fontWeight: 700, lineHeight: 1.05 }}
+                style={{ fontSize: 36, fontWeight: 700, lineHeight: 1.05 }}
               >
                 Módulos <span style={{ color: C.gold }}>Pré-Evento</span>
               </div>
               <div
                 className="sans"
-                style={{ fontSize: 13, color: C.muted, marginTop: 6 }}
+                style={{ fontSize: 13, color: C.muted, marginTop: 8 }}
               >
                 Prepara a tua mente antes de chegares.
               </div>
             </div>
 
             {loadingModules &&
-              [1, 2, 3].map((i) => <Skeleton key={i} h={84} mb={10} />)}
+              [1, 2, 3].map((i) => <Skeleton key={i} h={80} mb={10} />)}
 
             {!loadingModules && modules.length === 0 && (
               <div
@@ -1643,7 +1776,7 @@ export default function App() {
                   background: C.card,
                   border: `1px solid ${C.border}`,
                   borderRadius: 14,
-                  padding: 20,
+                  padding: 22,
                 }}
               >
                 <div className="sans" style={{ fontSize: 13, color: C.muted }}>
@@ -1661,24 +1794,28 @@ export default function App() {
                   !m.unlock_date ||
                   new Date(m.unlock_date) <= new Date();
                 const expanded = expandedModule === m.id;
+                const done = completedModuleIds.has(m.id);
                 return (
                   <div
                     key={m.id}
-                    className="press"
                     onClick={() =>
-                      unlocked && setExpanded(expanded ? null : m.id)
+                      unlocked && setExpandedModule(expanded ? null : m.id)
                     }
+                    className={unlocked ? "card-hover" : ""}
                     style={{
-                      background: unlocked ? C.card : `${C.card}99`,
+                      background: C.card,
                       border: `1px solid ${
-                        unlocked ? C.border : C.border + "55"
+                        done ? "rgba(60,184,120,0.25)" : C.border
                       }`,
-                      borderRadius: 16,
+                      borderRadius: 18,
                       padding: 16,
                       marginBottom: 10,
-                      opacity: unlocked ? 1 : 0.55,
+                      opacity: unlocked ? 1 : 0.5,
                       cursor: unlocked ? "pointer" : "default",
-                      transition: "all 0.25s",
+                      transition: "all .25s",
+                      boxShadow: done
+                        ? "0 0 0 1px rgba(60,184,120,0.1)"
+                        : "none",
                     }}
                   >
                     <div
@@ -1686,30 +1823,38 @@ export default function App() {
                     >
                       <div
                         style={{
-                          width: 50,
-                          height: 50,
+                          width: 52,
+                          height: 52,
                           borderRadius: 14,
                           flexShrink: 0,
                           background: unlocked
-                            ? C.goldGlow
-                            : "rgba(255,255,255,0.03)",
+                            ? done
+                              ? C.successFaint
+                              : C.goldFaint
+                            : "rgba(255,255,255,0.02)",
                           border: `1px solid ${
-                            unlocked ? C.borderGold : C.border
+                            unlocked
+                              ? done
+                                ? "rgba(60,184,120,0.3)"
+                                : C.borderGold
+                              : C.border
                           }`,
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          fontSize: 24,
+                          fontSize: 26,
+                          transition: "all .25s",
                         }}
                       >
                         {m.icon || "▶"}
                       </div>
-                      <div style={{ flex: 1 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
                         <div
                           style={{
                             display: "flex",
                             justifyContent: "space-between",
                             alignItems: "center",
+                            gap: 8,
                           }}
                         >
                           <div
@@ -1723,17 +1868,31 @@ export default function App() {
                             {m.title}
                           </div>
                           {!unlocked ? (
-                            <span style={{ fontSize: 13 }}>🔒</span>
+                            <span style={{ fontSize: 14 }}>🔒</span>
+                          ) : done ? (
+                            <span
+                              className="sans"
+                              style={{
+                                fontSize: 10,
+                                color: C.success,
+                                background: C.successFaint,
+                                border: "1px solid rgba(60,184,120,0.2)",
+                                borderRadius: 999,
+                                padding: "3px 8px",
+                              }}
+                            >
+                              ✓ Feito
+                            </span>
                           ) : (
                             <span
                               style={{
-                                fontSize: 13,
+                                fontSize: 14,
                                 color: C.muted,
                                 display: "inline-block",
                                 transform: expanded
                                   ? "rotate(180deg)"
                                   : "rotate(0)",
-                                transition: "transform 0.25s",
+                                transition: "transform .25s",
                               }}
                             >
                               ▾
@@ -1745,11 +1904,6 @@ export default function App() {
                           style={{ fontSize: 11, color: C.muted, marginTop: 3 }}
                         >
                           {m.duration || "Em breve"}
-                          {completedModuleIds.has(m.id) && (
-                            <span style={{ color: C.success, marginLeft: 8 }}>
-                              ✓ Concluído
-                            </span>
-                          )}
                         </div>
                       </div>
                     </div>
@@ -1767,7 +1921,7 @@ export default function App() {
                           style={{
                             fontSize: 13,
                             color: C.offwhite,
-                            lineHeight: 1.7,
+                            lineHeight: 1.75,
                           }}
                         >
                           {m.teaser}
@@ -1777,34 +1931,33 @@ export default function App() {
                             href={m.content_link}
                             target="_blank"
                             rel="noreferrer"
-                            onClick={() => markModuleCompleted(m)}
+                            onClick={() => markModuleDone(m)}
+                            className="gold-btn"
                             style={{
                               display: "block",
                               textAlign: "center",
                               marginTop: 14,
-                              background: `linear-gradient(135deg, ${C.gold}, ${C.goldDim})`,
-                              borderRadius: 12,
+                              borderRadius: 14,
                               padding: "13px",
                               fontFamily: "DM Sans",
-                              fontWeight: 700,
+                              fontWeight: 800,
                               fontSize: 14,
                               color: C.obsidian,
                               textDecoration: "none",
-                              boxShadow: "0 4px 20px rgba(201,168,76,0.22)",
                             }}
                           >
                             ▶ Assistir Módulo
                           </a>
                         ) : (
                           <div
+                            className="sans"
                             style={{
                               marginTop: 14,
-                              background: "rgba(255,255,255,0.03)",
+                              background: "rgba(255,255,255,0.02)",
                               border: `1px solid ${C.border}`,
                               borderRadius: 12,
                               padding: 13,
                               textAlign: "center",
-                              fontFamily: "DM Sans",
                               fontSize: 13,
                               color: C.muted,
                             }}
@@ -1814,13 +1967,12 @@ export default function App() {
                         )}
                       </div>
                     )}
-
                     {!unlocked && m.teaser && (
                       <div
                         style={{
                           marginTop: 10,
                           padding: "10px 12px",
-                          background: "rgba(255,255,255,0.025)",
+                          background: "rgba(255,255,255,0.02)",
                           borderRadius: 10,
                         }}
                       >
@@ -1837,18 +1989,19 @@ export default function App() {
               })}
             </div>
 
+            {/* Bonus */}
             <div
               style={{
-                background: C.accentGlow,
-                border: `1px solid rgba(93,86,232,0.25)`,
-                borderRadius: 14,
-                padding: "16px 18px",
+                background: C.accentFaint,
+                border: `1px solid rgba(107,95,234,0.22)`,
+                borderRadius: 16,
+                padding: "18px 20px",
                 marginTop: 10,
               }}
             >
               <div
                 className="sans"
-                style={{ fontSize: 12, color: "#A09BFF", lineHeight: 1.7 }}
+                style={{ fontSize: 12, color: "#A09BFF", lineHeight: 1.75 }}
               >
                 🎁 <strong style={{ color: C.white }}>Bónus exclusivo:</strong>{" "}
                 Quem completa os módulos disponíveis recebe materiais de apoio
@@ -1858,42 +2011,43 @@ export default function App() {
           </div>
         )}
 
-        {/* ══════════════════ COMMUNITY ═════════════════════════════════════ */}
+        {/* ══════════ COMMUNITY ════════════════════════════════════════════ */}
         {tab === "community" && (
-          <div className="tab-in">
-            <div style={{ padding: "28px 0 20px" }}>
-              <div className="dsp" style={{ fontSize: 34, fontWeight: 700 }}>
+          <div className="fade-in">
+            <div style={{ padding: "30px 0 22px" }}>
+              <div className="dsp" style={{ fontSize: 36, fontWeight: 700 }}>
                 Comunidade <span style={{ color: C.gold }}>✦</span>
               </div>
               <div
                 className="sans"
-                style={{ fontSize: 13, color: C.muted, marginTop: 4 }}
+                style={{ fontSize: 13, color: C.muted, marginTop: 6 }}
               >
                 {loadingCommunity
-                  ? "A carregar conversas..."
+                  ? "A carregar conversas…"
                   : `${posts.length} mensagens da comunidade`}
               </div>
             </div>
 
-            {/* Compose */}
+            {/* Compose box */}
             <div
               style={{
-                background: `linear-gradient(135deg, ${C.card} 0%, ${C.cardHover} 100%)`,
+                background: `linear-gradient(160deg, ${C.cardRaised}, ${C.card})`,
                 border: `1px solid ${C.borderGold}`,
-                borderRadius: 18,
-                padding: 16,
-                marginBottom: 18,
-                boxShadow: "0 12px 48px rgba(201,168,76,0.06)",
+                borderRadius: 20,
+                padding: 18,
+                marginBottom: 20,
+                boxShadow:
+                  "0 16px 56px rgba(0,0,0,0.3), 0 0 0 1px rgba(201,168,76,0.05)",
               }}
             >
               {replyingTo && (
                 <div
                   style={{
-                    background: "rgba(201,168,76,0.08)",
+                    background: "rgba(201,168,76,0.07)",
                     border: `1px solid ${C.borderGold}`,
-                    borderRadius: 12,
-                    padding: "10px 12px",
-                    marginBottom: 12,
+                    borderRadius: 14,
+                    padding: "10px 14px",
+                    marginBottom: 14,
                     display: "flex",
                     justifyContent: "space-between",
                     gap: 10,
@@ -1926,56 +2080,38 @@ export default function App() {
                       border: "none",
                       background: "transparent",
                       color: C.muted,
-                      fontSize: 18,
+                      fontSize: 20,
                       cursor: "pointer",
+                      lineHeight: 1,
                     }}
                   >
                     ×
                   </button>
                 </div>
               )}
-
-              <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
-                <div
-                  style={{
-                    width: 38,
-                    height: 38,
-                    borderRadius: "50%",
-                    flexShrink: 0,
-                    background: currentAvatarIsImage
-                      ? `url(${currentAvatar}) center/cover`
-                      : `linear-gradient(135deg, ${C.gold}, ${C.goldDim})`,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontFamily: "DM Sans",
-                    fontWeight: 700,
-                    fontSize: 12,
-                    color: C.obsidian,
-                  }}
-                >
-                  {!currentAvatarIsImage && currentAvatar}
-                </div>
+              <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
+                <Avatar src={currentAvatar} name={currentName} size={40} />
                 <textarea
                   value={newMsg}
                   onChange={(e) => setNewMsg(e.target.value)}
                   placeholder={
                     replyingTo
-                      ? "Escreve a tua resposta..."
-                      : "Partilha uma ideia, dúvida ou conquista..."
+                      ? "Escreve a tua resposta…"
+                      : "Partilha uma ideia, dúvida ou conquista…"
                   }
                   style={{
                     flex: 1,
                     background: "rgba(255,255,255,0.03)",
                     border: `1px solid ${C.border}`,
-                    borderRadius: 12,
-                    padding: "11px 12px",
+                    borderRadius: 14,
+                    padding: "12px 14px",
                     color: C.white,
                     fontFamily: "DM Sans",
                     fontSize: 13,
                     resize: "none",
-                    height: 86,
-                    transition: "border 0.2s",
+                    height: 90,
+                    lineHeight: 1.6,
+                    transition: "border-color .2s",
                   }}
                 />
               </div>
@@ -1984,28 +2120,27 @@ export default function App() {
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
-                  gap: 12,
                 }}
               >
-                <div className="sans" style={{ fontSize: 10, color: C.muted }}>
-                  Conversa visível para participantes do Acelera.
+                <div className="sans" style={{ fontSize: 10, color: C.faint }}>
+                  Visível para participantes do Acelera.
                 </div>
                 <button
                   onClick={sendMsg}
                   disabled={!newMsg.trim()}
+                  className={newMsg.trim() ? "gold-btn" : ""}
                   style={{
                     background: newMsg.trim()
-                      ? `linear-gradient(135deg, ${C.gold}, ${C.goldDim})`
-                      : "rgba(255,255,255,0.05)",
+                      ? undefined
+                      : "rgba(255,255,255,0.04)",
                     border: "none",
                     borderRadius: 12,
-                    padding: "10px 18px",
+                    padding: "10px 20px",
                     fontFamily: "DM Sans",
                     fontWeight: 800,
                     fontSize: 13,
                     color: newMsg.trim() ? C.obsidian : C.muted,
                     cursor: newMsg.trim() ? "pointer" : "not-allowed",
-                    whiteSpace: "nowrap",
                   }}
                 >
                   {replyingTo ? "Responder" : "Publicar"}
@@ -2013,143 +2148,98 @@ export default function App() {
               </div>
             </div>
 
-            {loadingCommunity && (
-              <>
-                <Skeleton h={120} mb={10} />
-                <Skeleton h={120} mb={10} />
-                <Skeleton h={120} mb={10} />
-              </>
-            )}
+            {loadingCommunity &&
+              [1, 2, 3].map((i) => <Skeleton key={i} h={130} mb={12} />)}
 
             {!loadingCommunity && posts.length === 0 && (
               <div
                 style={{
                   background: C.card,
                   border: `1px solid ${C.border}`,
-                  borderRadius: 18,
-                  padding: 22,
+                  borderRadius: 20,
+                  padding: 28,
                   textAlign: "center",
                 }}
               >
-                <div className="dsp" style={{ fontSize: 24, color: C.gold }}>
-                  Ainda está silencioso por aqui.
-                </div>
                 <div
-                  className="sans"
-                  style={{ fontSize: 13, color: C.muted, marginTop: 6 }}
+                  className="dsp"
+                  style={{ fontSize: 26, color: C.gold, marginBottom: 8 }}
                 >
-                  Sê a primeira pessoa a partilhar uma ideia com a comunidade.
+                  Ainda está silencioso.
+                </div>
+                <div className="sans" style={{ fontSize: 13, color: C.muted }}>
+                  Sê a primeira pessoa a partilhar algo com a comunidade.
                 </div>
               </div>
             )}
 
-            {/* Posts */}
             <div className="stagger">
               {posts.map((p) => {
                 const authorName = p.author?.name || "Participante";
-                const avatarValue = p.author?.avatar || initials(authorName);
-                const avatarIsImage =
-                  typeof avatarValue === "string" &&
-                  avatarValue.startsWith("http");
-
+                const aImg = p.author?.avatar;
                 return (
                   <div
                     id={`post-${p.id}`}
                     key={p.id}
-                    className="community-post"
                     style={{
-                      background: `linear-gradient(135deg, ${C.card} 0%, ${C.deep} 100%)`,
+                      background: `linear-gradient(160deg, ${C.cardRaised}, ${C.card})`,
                       border: `1px solid ${C.border}`,
-                      borderRadius: 18,
-                      padding: 16,
+                      borderRadius: 20,
+                      padding: 18,
                       marginBottom: 12,
+                      transition: "box-shadow .35s, transform .2s",
                       scrollMarginTop: 130,
                     }}
                   >
-                    <div style={{ display: "flex", gap: 11, marginBottom: 12 }}>
+                    {/* Author row */}
+                    <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
+                      <Avatar src={aImg} name={authorName} size={44} />
                       <div
                         style={{
-                          width: 42,
-                          height: 42,
-                          borderRadius: "50%",
-                          flexShrink: 0,
-                          background: avatarIsImage
-                            ? `url(${avatarValue}) center/cover`
-                            : C.goldGlow,
-                          border: `1px solid ${C.borderGold}`,
+                          flex: 1,
+                          minWidth: 0,
                           display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          fontFamily: "DM Sans",
-                          fontWeight: 800,
-                          fontSize: 12,
-                          color: C.gold,
+                          justifyContent: "space-between",
+                          alignItems: "flex-start",
                         }}
                       >
-                        {!avatarIsImage && avatarValue}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "flex-start",
-                            gap: 10,
-                          }}
-                        >
-                          <div>
-                            <div
-                              className="sans"
-                              style={{
-                                fontSize: 13,
-                                fontWeight: 700,
-                                color: C.white,
-                              }}
-                            >
-                              {authorName}
-                            </div>
-                            <div
-                              className="sans"
-                              style={{
-                                fontSize: 10,
-                                color: C.muted,
-                                marginTop: 2,
-                              }}
-                            >
-                              {formatTimeAgo(p.created_at)}
-                            </div>
+                        <div>
+                          <div
+                            className="sans"
+                            style={{
+                              fontSize: 13,
+                              fontWeight: 700,
+                              color: C.white,
+                            }}
+                          >
+                            {authorName}
                           </div>
-                          {p.author?.role === "admin" && (
-                            <span
-                              className="sans"
-                              style={{
-                                border: `1px solid ${C.borderGold}`,
-                                color: C.gold,
-                                borderRadius: 999,
-                                padding: "4px 8px",
-                                fontSize: 9,
-                                fontWeight: 800,
-                                background: C.goldGlow,
-                                textTransform: "uppercase",
-                              }}
-                            >
-                              admin
-                            </span>
-                          )}
+                          <div
+                            className="sans"
+                            style={{
+                              fontSize: 10,
+                              color: C.muted,
+                              marginTop: 2,
+                            }}
+                          >
+                            {formatTimeAgo(p.created_at)}
+                          </div>
                         </div>
+                        {p.author?.role === "admin" && <Badge>admin</Badge>}
                       </div>
                     </div>
 
+                    {/* Reply preview */}
                     {p.repliedPost && (
                       <button
                         onClick={() => scrollToPost(p.repliedPost.id)}
                         style={{
                           width: "100%",
                           textAlign: "left",
-                          background: "rgba(201,168,76,0.07)",
+                          background: "rgba(201,168,76,0.06)",
                           border: `1px solid ${C.borderGold}`,
                           borderRadius: 12,
-                          padding: "9px 11px",
+                          padding: "9px 12px",
                           marginBottom: 12,
                           cursor: "pointer",
                         }}
@@ -2159,10 +2249,10 @@ export default function App() {
                           style={{
                             fontSize: 10,
                             color: C.gold,
-                            fontWeight: 800,
+                            fontWeight: 700,
                           }}
                         >
-                          Em resposta a{" "}
+                          ↩ Em resposta a{" "}
                           {p.repliedPost.author?.name || "participante"}
                         </div>
                         <div
@@ -2181,18 +2271,20 @@ export default function App() {
                       </button>
                     )}
 
+                    {/* Message */}
                     <div
                       className="sans"
                       style={{
                         fontSize: 13,
                         color: C.offwhite,
-                        lineHeight: 1.7,
+                        lineHeight: 1.75,
                         whiteSpace: "pre-wrap",
                       }}
                     >
                       {p.message}
                     </div>
 
+                    {/* Reaction pills */}
                     {Object.keys(p.reactionSummary || {}).length > 0 && (
                       <div
                         style={{
@@ -2206,12 +2298,12 @@ export default function App() {
                           ([emoji, count]) => (
                             <button
                               key={emoji}
-                              className="emoji-pill"
                               onClick={() => reactToPost(p.id, emoji)}
+                              className="reaction-pill"
                               style={{
                                 border: `1px solid ${
                                   p.myReaction?.emoji === emoji
-                                    ? C.borderGold
+                                    ? C.borderGoldBright
                                     : C.border
                                 }`,
                                 background:
@@ -2220,10 +2312,14 @@ export default function App() {
                                     : "rgba(255,255,255,0.03)",
                                 color: C.offwhite,
                                 borderRadius: 999,
-                                padding: "5px 9px",
+                                padding: "5px 10px",
                                 cursor: "pointer",
                                 fontFamily: "DM Sans",
                                 fontSize: 12,
+                                boxShadow:
+                                  p.myReaction?.emoji === emoji
+                                    ? `0 0 12px rgba(201,168,76,0.25)`
+                                    : "none",
                               }}
                             >
                               {emoji} {count}
@@ -2233,11 +2329,12 @@ export default function App() {
                       </div>
                     )}
 
+                    {/* Actions */}
                     <div
                       style={{
                         display: "flex",
                         gap: 8,
-                        marginTop: 13,
+                        marginTop: 14,
                         position: "relative",
                       }}
                     >
@@ -2255,7 +2352,7 @@ export default function App() {
                             p.myReaction ? C.borderGold : C.border
                           }`,
                           borderRadius: 20,
-                          padding: "6px 13px",
+                          padding: "6px 14px",
                           cursor: "pointer",
                           display: "flex",
                           alignItems: "center",
@@ -2263,11 +2360,11 @@ export default function App() {
                           color: p.myReaction ? C.gold : C.muted,
                           fontFamily: "DM Sans",
                           fontSize: 12,
+                          transition: "all .18s",
                         }}
                       >
                         {p.myReaction?.emoji || "♡"} Reagir
                       </button>
-
                       <button
                         onClick={() => {
                           setReplyingTo(p);
@@ -2277,11 +2374,12 @@ export default function App() {
                           background: "transparent",
                           border: `1px solid ${C.border}`,
                           borderRadius: 20,
-                          padding: "6px 13px",
+                          padding: "6px 14px",
                           cursor: "pointer",
                           color: C.muted,
                           fontFamily: "DM Sans",
                           fontSize: 12,
+                          transition: "all .18s",
                         }}
                       >
                         Responder
@@ -2292,25 +2390,28 @@ export default function App() {
                           style={{
                             position: "absolute",
                             left: 0,
-                            bottom: 38,
+                            bottom: 40,
                             background: C.cardHover,
                             border: `1px solid ${C.borderGold}`,
                             borderRadius: 999,
                             padding: "8px 10px",
                             display: "flex",
-                            gap: 8,
-                            boxShadow: "0 14px 50px rgba(0,0,0,0.45)",
+                            gap: 6,
                             zIndex: 30,
+                            boxShadow:
+                              "0 16px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(201,168,76,0.08)",
+                            animation:
+                              "scaleIn .2s cubic-bezier(0.22,1,0.36,1)",
                           }}
                         >
                           {REACTION_EMOJIS.map((emoji) => (
                             <button
                               key={emoji}
-                              className="emoji-pill"
                               onClick={() => reactToPost(p.id, emoji)}
+                              className="emoji-btn"
                               style={{
-                                width: 32,
-                                height: 32,
+                                width: 34,
+                                height: 34,
                                 borderRadius: "50%",
                                 border: "none",
                                 background:
@@ -2318,7 +2419,11 @@ export default function App() {
                                     ? C.goldGlow
                                     : "rgba(255,255,255,0.04)",
                                 cursor: "pointer",
-                                fontSize: 17,
+                                fontSize: 18,
+                                boxShadow:
+                                  p.myReaction?.emoji === emoji
+                                    ? `0 0 12px rgba(201,168,76,0.4)`
+                                    : "none",
                               }}
                             >
                               {emoji}
@@ -2334,180 +2439,174 @@ export default function App() {
           </div>
         )}
 
-        {/* ══════════════════ EVENT ═════════════════════════════════════════
-            Tabelas Supabase:
-              event_info  → title, venue, address, maps_link, event_month, event_date, description, active
-              agenda      → time, title, type, active, position
-              speakers    → name, role, topic, avatar, color
-        ═══════════════════════════════════════════════════════════════════ */}
+        {/* ══════════ EVENT ════════════════════════════════════════════════ */}
         {tab === "event" && (
-          <div className="tab-in">
-            <div style={{ padding: "28px 0 20px" }}>
-              <div className="dsp" style={{ fontSize: 34, fontWeight: 700 }}>
+          <div className="fade-in">
+            <div style={{ padding: "30px 0 22px" }}>
+              <div className="dsp" style={{ fontSize: 36, fontWeight: 700 }}>
                 O <span style={{ color: C.gold }}>Evento</span>
               </div>
               <div
                 className="sans"
-                style={{ fontSize: 13, color: C.muted, marginTop: 4 }}
+                style={{ fontSize: 13, color: C.muted, marginTop: 6 }}
               >
-                Sabe o que te espera.
+                Sabe o que te espera no dia.
               </div>
             </div>
 
             {loadingEvent && (
               <>
-                <Skeleton h={100} mb={14} />
-                <Skeleton h={48} mb={10} />
-                <Skeleton h={48} mb={10} />
-                <Skeleton h={48} mb={10} />
-                <Skeleton h={48} mb={10} />
+                <Skeleton h={120} mb={16} />
+                <Skeleton h={60} mb={10} />
+                <Skeleton h={60} mb={10} />
+                <Skeleton h={60} mb={10} />
               </>
             )}
 
             {!loadingEvent && (
               <div className="stagger">
-                {/* Location */}
+                {/* Location card */}
                 <div
                   style={{
-                    background: `linear-gradient(135deg, #14102A 0%, #0D0F20 100%)`,
-                    border: `1px solid rgba(93,86,232,0.22)`,
-                    borderRadius: 20,
-                    padding: 20,
-                    marginBottom: 18,
+                    background: "linear-gradient(145deg, #14102A, #0D0F20)",
+                    border: `1px solid rgba(107,95,234,0.22)`,
+                    borderRadius: 22,
+                    padding: 22,
+                    marginBottom: 20,
                     boxShadow:
-                      "0 0 0 1px rgba(93,86,232,0.08), 0 10px 40px rgba(93,86,232,0.07)",
+                      "0 0 0 1px rgba(107,95,234,0.06), 0 14px 50px rgba(107,95,234,0.08)",
+                    position: "relative",
+                    overflow: "hidden",
                   }}
                 >
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: 14,
-                      alignItems: "flex-start",
-                    }}
-                  >
+                  <OrbBg variant="accent" />
+                  <div style={{ position: "relative", zIndex: 1 }}>
                     <div
                       style={{
-                        width: 54,
-                        height: 54,
-                        borderRadius: 14,
-                        flexShrink: 0,
-                        background: C.accentGlow,
-                        border: `1px solid rgba(93,86,232,0.25)`,
+                        display: "flex",
+                        gap: 14,
+                        alignItems: "flex-start",
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 56,
+                          height: 56,
+                          borderRadius: 16,
+                          flexShrink: 0,
+                          background: C.accentFaint,
+                          border: `1px solid rgba(107,95,234,0.25)`,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: 28,
+                        }}
+                      >
+                        📍
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div
+                          className="sans"
+                          style={{
+                            fontSize: 16,
+                            fontWeight: 700,
+                            color: C.white,
+                            lineHeight: 1.3,
+                          }}
+                        >
+                          {eventInfo?.venue ||
+                            "Hotel Polana — Sala Grandes Nomes"}
+                        </div>
+                        <div
+                          className="sans"
+                          style={{ fontSize: 12, color: C.muted, marginTop: 4 }}
+                        >
+                          {eventInfo?.address || "Av. Julius Nyerere, Maputo"}
+                        </div>
+                        {(eventInfo?.event_month || eventInfo?.event_date) && (
+                          <div
+                            className="sans"
+                            style={{
+                              fontSize: 11,
+                              color: C.accentLight,
+                              marginTop: 8,
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 5,
+                            }}
+                          >
+                            <span>📅</span>
+                            {eventInfo?.event_month ||
+                              new Date(eventInfo.event_date).toLocaleDateString(
+                                "pt-PT"
+                              )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <a
+                      href={mapUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        fontSize: 26,
+                        gap: 8,
+                        marginTop: 18,
+                        background: "rgba(107,95,234,0.15)",
+                        border: `1px solid rgba(107,95,234,0.28)`,
+                        borderRadius: 14,
+                        padding: "13px",
+                        textDecoration: "none",
+                        fontFamily: "DM Sans",
+                        fontWeight: 600,
+                        fontSize: 13,
+                        color: "#A09BFF",
+                        transition: "all .22s",
                       }}
                     >
-                      📍
-                    </div>
-                    <div style={{ flex: 1 }}>
+                      🗺️ Abrir no Google Maps
+                    </a>
+
+                    {eventInfo?.description && (
                       <div
                         className="sans"
                         style={{
-                          fontSize: 15,
-                          fontWeight: 700,
-                          color: C.white,
-                          lineHeight: 1.3,
+                          fontSize: 12,
+                          color: C.muted,
+                          marginTop: 16,
+                          lineHeight: 1.7,
                         }}
                       >
-                        {eventInfo?.venue ||
-                          "Hotel Polana — Sala Grandes Nomes"}
+                        {eventInfo.description}
                       </div>
-                      <div
-                        className="sans"
-                        style={{ fontSize: 12, color: C.muted, marginTop: 4 }}
-                      >
-                        {eventInfo?.address || "Av. Julius Nyerere, Maputo"}
-                      </div>
-                      {(eventInfo?.event_month || eventInfo?.event_date) && (
-                        <div
-                          className="sans"
-                          style={{ fontSize: 11, color: C.gold, marginTop: 6 }}
-                        >
-                          📅{" "}
-                          {eventInfo?.event_month ||
-                            new Date(eventInfo.event_date).toLocaleDateString(
-                              "pt-PT"
-                            )}
-                        </div>
-                      )}
-                    </div>
+                    )}
                   </div>
-
-                  {/* Open Map button — clicável */}
-                  <a
-                    href={mapUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="map-btn"
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 8,
-                      marginTop: 16,
-                      background: "rgba(93,86,232,0.15)",
-                      border: `1px solid rgba(93,86,232,0.28)`,
-                      borderRadius: 12,
-                      padding: "12px",
-                      fontFamily: "DM Sans",
-                      fontWeight: 600,
-                      fontSize: 13,
-                      color: "#A09BFF",
-                      textDecoration: "none",
-                    }}
-                  >
-                    🗺️ Abrir no Google Maps
-                  </a>
-
-                  {eventInfo?.description && (
-                    <div
-                      className="sans"
-                      style={{
-                        fontSize: 12,
-                        color: C.muted,
-                        marginTop: 14,
-                        lineHeight: 1.65,
-                      }}
-                    >
-                      {eventInfo.description}
-                    </div>
-                  )}
                 </div>
 
                 {/* Speakers */}
                 {speakers.length > 0 && (
                   <>
-                    <div
-                      className="sans"
-                      style={{
-                        fontSize: 9,
-                        letterSpacing: 3,
-                        color: C.muted,
-                        textTransform: "uppercase",
-                        marginBottom: 12,
-                      }}
-                    >
-                      Oradores
-                    </div>
+                    <SectionLabel>Oradores</SectionLabel>
                     <div
                       style={{
                         display: "flex",
                         flexDirection: "column",
                         gap: 10,
-                        marginBottom: 18,
+                        marginBottom: 20,
                       }}
                     >
                       {speakers.map((s, i) => (
                         <div
                           key={i}
-                          className="press"
+                          className="card-hover press"
                           style={{
                             background: C.card,
                             border: `1px solid ${C.border}`,
-                            borderRadius: 14,
-                            padding: "14px 16px",
+                            borderRadius: 16,
+                            padding: "16px 18px",
                             display: "flex",
                             alignItems: "center",
                             gap: 14,
@@ -2515,17 +2614,17 @@ export default function App() {
                         >
                           <div
                             style={{
-                              width: 50,
-                              height: 50,
+                              width: 52,
+                              height: 52,
                               borderRadius: "50%",
                               flexShrink: 0,
-                              background: `${s.color || C.gold}16`,
+                              background: `${s.color || C.gold}14`,
                               border: `2px solid ${s.color || C.gold}28`,
                               display: "flex",
                               alignItems: "center",
                               justifyContent: "center",
                               fontFamily: "DM Sans",
-                              fontWeight: 700,
+                              fontWeight: 800,
                               fontSize: 15,
                               color: s.color || C.gold,
                             }}
@@ -2537,7 +2636,7 @@ export default function App() {
                                 .join("")
                                 .slice(0, 2)}
                           </div>
-                          <div>
+                          <div style={{ flex: 1 }}>
                             <div
                               className="sans"
                               style={{
@@ -2550,7 +2649,11 @@ export default function App() {
                             </div>
                             <div
                               className="sans"
-                              style={{ fontSize: 11, color: C.muted }}
+                              style={{
+                                fontSize: 11,
+                                color: C.muted,
+                                marginTop: 2,
+                              }}
                             >
                               {s.role}
                             </div>
@@ -2561,7 +2664,7 @@ export default function App() {
                                   fontSize: 13,
                                   fontStyle: "italic",
                                   color: s.color || C.gold,
-                                  marginTop: 3,
+                                  marginTop: 4,
                                 }}
                               >
                                 "{s.topic}"
@@ -2577,33 +2680,21 @@ export default function App() {
                 {/* Agenda */}
                 {agenda.length > 0 && (
                   <>
-                    <div
-                      className="sans"
-                      style={{
-                        fontSize: 9,
-                        letterSpacing: 3,
-                        color: C.muted,
-                        textTransform: "uppercase",
-                        marginBottom: 14,
-                      }}
-                    >
-                      Agenda do Dia
-                    </div>
-                    <div style={{ position: "relative", marginBottom: 18 }}>
-                      {/* timeline vertical line */}
+                    <SectionLabel>Agenda do Dia</SectionLabel>
+                    <div style={{ position: "relative", marginBottom: 22 }}>
+                      {/* Timeline line */}
                       <div
                         style={{
                           position: "absolute",
                           left: 44,
-                          top: 6,
-                          bottom: 6,
+                          top: 10,
+                          bottom: 10,
                           width: 1,
                           background: `linear-gradient(180deg, transparent, ${C.border} 8%, ${C.border} 92%, transparent)`,
                         }}
                       />
-
                       {agenda.map((a, i) => {
-                        const dotColor = TYPE_COLORS[a.type] || C.muted;
+                        const dot = TYPE_COLORS[a.type] || C.muted;
                         return (
                           <div
                             key={a.id || i}
@@ -2621,7 +2712,7 @@ export default function App() {
                                 color: C.muted,
                                 width: 38,
                                 textAlign: "right",
-                                paddingTop: 11,
+                                paddingTop: 12,
                                 flexShrink: 0,
                               }}
                             >
@@ -2632,22 +2723,22 @@ export default function App() {
                                 width: 16,
                                 height: 16,
                                 borderRadius: "50%",
-                                background: `linear-gradient(135deg, ${dotColor}, ${C.white})`,
+                                background: `linear-gradient(135deg, ${dot}, rgba(255,255,255,0.6))`,
                                 border: `3px solid ${C.obsidian}`,
                                 flexShrink: 0,
-                                marginTop: 10,
+                                marginTop: 11,
                                 zIndex: 1,
-                                boxShadow: `0 0 18px ${dotColor}`,
+                                boxShadow: `0 0 18px ${dot}99`,
                               }}
                             />
                             <div
                               style={{
                                 flex: 1,
-                                background: `linear-gradient(135deg, ${C.card} 0%, ${C.cardHover} 100%)`,
-                                border: `1px solid ${dotColor}30`,
+                                background: `linear-gradient(135deg, ${C.card}, ${C.cardHover})`,
+                                border: `1px solid ${dot}28`,
                                 borderRadius: 16,
-                                padding: "14px 16px",
-                                boxShadow: `0 0 22px ${dotColor}15`,
+                                padding: "13px 16px",
+                                boxShadow: `0 0 24px ${dot}12`,
                               }}
                             >
                               <div
@@ -2673,14 +2764,14 @@ export default function App() {
                                     width: 4,
                                     height: 4,
                                     borderRadius: "50%",
-                                    background: dotColor,
+                                    background: dot,
                                   }}
                                 />
                                 <span
                                   className="sans"
                                   style={{
                                     fontSize: 9,
-                                    color: dotColor,
+                                    color: dot,
                                     textTransform: "capitalize",
                                     letterSpacing: 0.5,
                                   }}
@@ -2697,62 +2788,64 @@ export default function App() {
                 )}
 
                 {/* What to bring */}
+                <SectionLabel>O que trazer</SectionLabel>
                 <div
                   style={{
                     background: C.card,
                     border: `1px solid ${C.border}`,
-                    borderRadius: 16,
-                    padding: "18px 20px",
+                    borderRadius: 18,
+                    padding: "20px 22px",
                   }}
                 >
-                  <div
-                    className="sans"
-                    style={{
-                      fontSize: 13,
-                      fontWeight: 600,
-                      color: C.white,
-                      marginBottom: 14,
-                    }}
-                  >
-                    O que trazer 📋
-                  </div>
                   {[
-                    "Bilhete (este app funciona como bilhete)",
-                    "Cartão de visita ou contacto digital",
-                    "Bloco de notas — vais querer escrever muito",
-                    "Mente aberta e vontade de crescer",
+                    {
+                      icon: "🎟️",
+                      text: "Bilhete (este app funciona como bilhete)",
+                    },
+                    {
+                      icon: "💼",
+                      text: "Cartão de visita ou contacto digital",
+                    },
+                    {
+                      icon: "📓",
+                      text: "Bloco de notas — vais querer escrever muito",
+                    },
+                    { icon: "🌟", text: "Mente aberta e vontade de crescer" },
                   ].map((item, i) => (
                     <div
                       key={i}
                       style={{
                         display: "flex",
                         alignItems: "center",
-                        gap: 12,
-                        marginBottom: 12,
+                        gap: 14,
+                        marginBottom: i < 3 ? 14 : 0,
                       }}
                     >
                       <div
                         style={{
-                          width: 22,
-                          height: 22,
-                          borderRadius: "50%",
+                          width: 34,
+                          height: 34,
+                          borderRadius: 10,
                           flexShrink: 0,
-                          background: C.goldGlow,
+                          background: C.goldFaint,
                           border: `1px solid ${C.borderGold}`,
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          fontSize: 10,
-                          color: C.gold,
+                          fontSize: 16,
                         }}
                       >
-                        ✓
+                        {item.icon}
                       </div>
                       <div
                         className="sans"
-                        style={{ fontSize: 12, color: C.offwhite }}
+                        style={{
+                          fontSize: 13,
+                          color: C.offwhite,
+                          lineHeight: 1.5,
+                        }}
                       >
-                        {item}
+                        {item.text}
                       </div>
                     </div>
                   ))}
@@ -2763,325 +2856,307 @@ export default function App() {
         )}
       </main>
 
+      {/* ── PROFILE MODAL ──────────────────────────────────────────────────── */}
       {profileOpen && (
         <div
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(0,0,0,0.62)",
-            backdropFilter: "blur(10px)",
-            WebkitBackdropFilter: "blur(10px)",
+            background: "rgba(0,0,0,0.7)",
+            backdropFilter: "blur(16px)",
+            WebkitBackdropFilter: "blur(16px)",
             zIndex: 999,
             display: "flex",
             alignItems: "flex-end",
             justifyContent: "center",
-            padding: 18,
+            padding: 16,
           }}
           onClick={() => setProfileOpen(false)}
         >
           <div
+            className="slide-up"
             onClick={(e) => e.stopPropagation()}
             style={{
               width: "100%",
               maxWidth: 430,
-              background: `linear-gradient(180deg, ${C.cardHover} 0%, ${C.deep} 100%)`,
+              position: "relative",
+              overflow: "hidden",
+              background: "rgba(16,16,34,0.92)",
+              backdropFilter: "blur(40px)",
+              WebkitBackdropFilter: "blur(40px)",
               border: `1px solid ${C.borderGold}`,
-              borderRadius: 24,
-              padding: 22,
-              boxShadow: "0 20px 80px rgba(0,0,0,0.45)",
+              borderRadius: 28,
+              padding: 24,
+              boxShadow:
+                "0 24px 100px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.04)",
             }}
           >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: 18,
-              }}
-            >
-              <div>
-                <div
-                  className="dsp"
-                  style={{ fontSize: 28, fontWeight: 700, color: C.white }}
-                >
-                  Meu Perfil
-                </div>
-                <div
-                  className="sans"
-                  style={{ fontSize: 12, color: C.muted, marginTop: 2 }}
-                >
-                  Actualiza apenas os teus dados.
-                </div>
-              </div>
-
-              <button
-                onClick={() => setProfileOpen(false)}
-                style={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: "50%",
-                  border: `1px solid ${C.border}`,
-                  background: "rgba(255,255,255,0.03)",
-                  color: C.offwhite,
-                  cursor: "pointer",
-                  fontSize: 18,
-                }}
-              >
-                ×
-              </button>
-            </div>
-
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 16,
-                marginBottom: 18,
-              }}
-            >
+            <OrbBg />
+            <div style={{ position: "relative", zIndex: 1 }}>
+              {/* Header */}
               <div
                 style={{
-                  width: 76,
-                  height: 76,
-                  borderRadius: "50%",
-                  background: currentAvatarIsImage
-                    ? `url(${currentAvatar}) center/cover`
-                    : `linear-gradient(135deg, ${C.gold}, ${C.goldDim})`,
-                  border: `2px solid ${C.borderGold}`,
                   display: "flex",
+                  justifyContent: "space-between",
                   alignItems: "center",
-                  justifyContent: "center",
-                  fontFamily: "DM Sans",
-                  fontWeight: 800,
-                  fontSize: 20,
-                  color: C.obsidian,
-                  flexShrink: 0,
+                  marginBottom: 22,
                 }}
               >
-                {!currentAvatarIsImage && currentAvatar}
+                <div>
+                  <div
+                    className="dsp"
+                    style={{ fontSize: 30, fontWeight: 700, color: C.white }}
+                  >
+                    Meu Perfil
+                  </div>
+                  <div
+                    className="sans"
+                    style={{ fontSize: 12, color: C.muted, marginTop: 3 }}
+                  >
+                    Actualiza os teus dados.
+                  </div>
+                </div>
+                <button
+                  onClick={() => setProfileOpen(false)}
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: "50%",
+                    border: `1px solid ${C.border}`,
+                    background: "rgba(255,255,255,0.03)",
+                    color: C.offwhite,
+                    cursor: "pointer",
+                    fontSize: 20,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  ×
+                </button>
               </div>
 
-              <div style={{ flex: 1 }}>
-                <label
-                  className="sans"
-                  style={{
-                    display: "inline-block",
-                    background: C.goldGlow,
-                    border: `1px solid ${C.borderGold}`,
-                    color: C.gold,
-                    borderRadius: 12,
-                    padding: "9px 12px",
-                    fontSize: 12,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                  }}
-                >
-                  {uploadingPhoto ? "A carregar..." : "Alterar foto"}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handlePhotoUpload}
-                    style={{ display: "none" }}
-                    disabled={uploadingPhoto}
-                  />
-                </label>
+              {/* Avatar section */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 18,
+                  marginBottom: 22,
+                }}
+              >
                 <div
-                  className="sans"
                   style={{
-                    fontSize: 10,
-                    color: C.muted,
-                    marginTop: 8,
-                    lineHeight: 1.5,
+                    width: 80,
+                    height: 80,
+                    borderRadius: "50%",
+                    flexShrink: 0,
+                    background: avatarIsImage
+                      ? `url(${currentAvatar}) center/cover no-repeat`
+                      : `linear-gradient(135deg, ${C.gold}, ${C.goldDim})`,
+                    border: `2px solid rgba(201,168,76,0.35)`,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontFamily: "DM Sans",
+                    fontWeight: 800,
+                    fontSize: 22,
+                    color: C.obsidian,
+                    boxShadow: "0 8px 32px rgba(201,168,76,0.2)",
                   }}
                 >
-                  A foto será enviada para o Supabase Storage e o link ficará
-                  guardado no teu perfil.
+                  {!avatarIsImage && initials(currentName)}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label
+                    className="sans"
+                    style={{
+                      display: "inline-block",
+                      background: C.goldFaint,
+                      border: `1px solid ${C.borderGold}`,
+                      color: C.gold,
+                      borderRadius: 12,
+                      padding: "10px 14px",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {uploadingPhoto ? "A carregar…" : "Alterar foto"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handlePhotoUpload}
+                      style={{ display: "none" }}
+                      disabled={uploadingPhoto}
+                    />
+                  </label>
+                  <div
+                    className="sans"
+                    style={{
+                      fontSize: 10,
+                      color: C.muted,
+                      marginTop: 8,
+                      lineHeight: 1.6,
+                    }}
+                  >
+                    A foto fica guardada no teu perfil.
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <div>
-                <label
-                  className="sans"
-                  style={{
-                    fontSize: 11,
-                    color: C.muted,
-                    display: "block",
-                    marginBottom: 6,
-                  }}
-                >
-                  Nome
-                </label>
+              <Divider my={0} />
+              <div style={{ height: 20 }} />
+
+              {/* Fields */}
+              <Field label="Nome">
                 <input
                   value={profile?.name || ""}
                   onChange={(e) =>
-                    setProfile((prev) => ({ ...prev, name: e.target.value }))
+                    setProfile((p) => ({ ...p, name: e.target.value }))
                   }
-                  style={{
-                    width: "100%",
-                    background: "rgba(255,255,255,0.035)",
-                    border: `1px solid ${C.border}`,
-                    borderRadius: 12,
-                    padding: "13px 14px",
-                    color: C.white,
-                    fontFamily: "DM Sans",
-                    fontSize: 14,
-                    outline: "none",
-                  }}
+                  style={{ ...inputStyle, borderRadius: 12 }}
                 />
-              </div>
-
-              <div>
-                <label
-                  className="sans"
-                  style={{
-                    fontSize: 11,
-                    color: C.muted,
-                    display: "block",
-                    marginBottom: 6,
-                  }}
-                >
-                  Email
-                </label>
+              </Field>
+              <div style={{ height: 12 }} />
+              <Field label="Email">
                 <div
                   className="sans"
                   style={{
                     background: "rgba(255,255,255,0.02)",
                     border: `1px solid ${C.border}`,
                     borderRadius: 12,
-                    padding: "13px 14px",
+                    padding: "14px 16px",
                     color: C.muted,
                     fontSize: 13,
                   }}
                 >
                   {currentEmail}
                 </div>
-              </div>
+              </Field>
 
               <div
                 style={{
                   display: "grid",
                   gridTemplateColumns: "1fr 1fr",
-                  gap: 10,
+                  gap: 12,
+                  marginTop: 16,
                 }}
               >
                 <div
                   style={{
                     background: "rgba(255,255,255,0.02)",
                     border: `1px solid ${C.border}`,
-                    borderRadius: 12,
-                    padding: 13,
+                    borderRadius: 14,
+                    padding: "14px 16px",
                   }}
                 >
                   <div
                     className="sans"
-                    style={{ fontSize: 10, color: C.muted, marginBottom: 5 }}
+                    style={{ fontSize: 10, color: C.muted, marginBottom: 6 }}
                   >
                     Progresso
                   </div>
                   <div
                     className="dsp"
-                    style={{ fontSize: 26, color: C.gold, lineHeight: 1 }}
+                    style={{ fontSize: 30, color: C.gold, lineHeight: 1 }}
                   >
-                    {progress}%
+                    {progress}
+                    <span style={{ fontSize: 14, color: C.goldDim }}>%</span>
                   </div>
                 </div>
-
                 <div
                   style={{
                     background: "rgba(255,255,255,0.02)",
                     border: `1px solid ${C.border}`,
-                    borderRadius: 12,
-                    padding: 13,
+                    borderRadius: 14,
+                    padding: "14px 16px",
                   }}
                 >
                   <div
                     className="sans"
-                    style={{ fontSize: 10, color: C.muted, marginBottom: 7 }}
+                    style={{ fontSize: 10, color: C.muted, marginBottom: 8 }}
                   >
                     Permissão
                   </div>
-                  <span
-                    className="sans"
-                    style={{
-                      display: "inline-block",
-                      borderRadius: 999,
-                      padding: "5px 10px",
-                      background:
-                        currentRole === "admin"
-                          ? C.goldGlow
-                          : "rgba(255,255,255,0.035)",
-                      border: `1px solid ${
-                        currentRole === "admin" ? C.borderGold : C.border
-                      }`,
-                      color: currentRole === "admin" ? C.gold : C.muted,
-                      fontSize: 11,
-                      fontWeight: 700,
-                      textTransform: "uppercase",
-                    }}
+                  <Badge
+                    color={currentRole === "admin" ? C.gold : C.muted}
+                    bg={
+                      currentRole === "admin"
+                        ? C.goldFaint
+                        : "rgba(255,255,255,0.03)"
+                    }
+                    border={currentRole === "admin" ? C.borderGold : C.border}
                   >
                     {currentRole}
-                  </span>
+                  </Badge>
                 </div>
               </div>
-            </div>
 
-            <button
-              onClick={saveProfile}
-              disabled={savingProfile || uploadingPhoto}
-              style={{
-                width: "100%",
-                marginTop: 18,
-                background: `linear-gradient(135deg, ${C.gold}, ${C.goldDim})`,
-                border: "none",
-                borderRadius: 14,
-                padding: "14px",
-                fontFamily: "DM Sans",
-                fontWeight: 800,
-                fontSize: 14,
-                color: C.obsidian,
-                cursor:
-                  savingProfile || uploadingPhoto ? "not-allowed" : "pointer",
-                opacity: savingProfile || uploadingPhoto ? 0.7 : 1,
-              }}
-            >
-              {savingProfile ? "A guardar..." : "Guardar alterações"}
-            </button>
-
-            <button
-              onClick={signOut}
-              style={{
-                width: "100%",
-                marginTop: 10,
-                background: "transparent",
-                border: `1px solid ${C.border}`,
-                borderRadius: 14,
-                padding: "12px",
-                fontFamily: "DM Sans",
-                fontWeight: 700,
-                fontSize: 13,
-                color: C.muted,
-                cursor: "pointer",
-              }}
-            >
-              Terminar sessão
-            </button>
-
-            {currentRole === "admin" && (
-              <div
-                className="sans"
+              <button
+                onClick={saveProfile}
+                disabled={savingProfile || uploadingPhoto}
+                className={savingProfile || uploadingPhoto ? "" : "gold-btn"}
                 style={{
-                  fontSize: 11,
-                  color: C.gold,
-                  marginTop: 12,
-                  textAlign: "center",
+                  width: "100%",
+                  marginTop: 20,
+                  border: "none",
+                  borderRadius: 16,
+                  padding: "15px",
+                  fontFamily: "DM Sans",
+                  fontWeight: 800,
+                  fontSize: 14,
+                  color: C.obsidian,
+                  background:
+                    savingProfile || uploadingPhoto
+                      ? "rgba(255,255,255,0.06)"
+                      : undefined,
+                  cursor:
+                    savingProfile || uploadingPhoto ? "not-allowed" : "pointer",
+                  opacity: savingProfile || uploadingPhoto ? 0.65 : 1,
                 }}
               >
-                Modo administrador activo. A gestão de outros perfis será
-                adicionada numa próxima etapa.
-              </div>
-            )}
+                {savingProfile ? "A guardar…" : "Guardar alterações"}
+              </button>
+
+              <button
+                onClick={signOut}
+                className="sans"
+                style={{
+                  width: "100%",
+                  marginTop: 10,
+                  background: "transparent",
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 14,
+                  padding: "13px",
+                  fontWeight: 600,
+                  fontSize: 13,
+                  color: C.muted,
+                  cursor: "pointer",
+                  transition: "all .2s",
+                }}
+              >
+                Terminar sessão
+              </button>
+
+              {currentRole === "admin" && (
+                <div
+                  className="sans"
+                  style={{
+                    fontSize: 11,
+                    color: C.gold,
+                    marginTop: 14,
+                    textAlign: "center",
+                    padding: "10px",
+                    background: C.goldFaint,
+                    borderRadius: 10,
+                    border: `1px solid ${C.borderGold}`,
+                  }}
+                >
+                  ✦ Modo administrador activo
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -3095,10 +3170,10 @@ export default function App() {
           transform: "translateX(-50%)",
           width: "100%",
           maxWidth: 430,
-          height: 56,
-          background: `linear-gradient(0deg, ${C.obsidian} 0%, transparent 100%)`,
+          height: 60,
           pointerEvents: "none",
           zIndex: 10,
+          background: `linear-gradient(0deg, ${C.obsidian} 0%, transparent 100%)`,
         }}
       />
     </div>
