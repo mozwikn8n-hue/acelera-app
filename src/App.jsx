@@ -26,14 +26,11 @@ const C = {
 const LOGO_URL =
   "https://artjsvhhkusuoaifxcpl.supabase.co/storage/v1/object/sign/logo-acelera/WhatsApp%20Image%202026-05-09%20at%2017.43.46.jpeg?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9lNGI5ZGM3Ny1iN2FhLTQwM2MtOGExZi0yNzQ1ZmY1ODQ4NTEiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJsb2dvLWFjZWxlcmEvV2hhdHNBcHAgSW1hZ2UgMjAyNi0wNS0wOSBhdCAxNy40My40Ni5qcGVnIiwiaWF0IjoxNzc4MzQxNjY4LCJleHAiOjE4NDE0MTM2Njh9.4XliF9nN6m512YmixQgz2fULG9hN9muEDeR7bcOIbws";
 
-const mockUser = {
-  name: "Dádiva Gulele",
-  email: "dad.gulele@gmail.com",
+const COURSE_INFO = {
   course: "Acelera – Carreira Com Propósito",
   edition: "4.0",
   eventDate: "2026-07-01T00:00:00+02:00",
   eventMonthLabel: "Julho de 2026",
-  avatar: "DG",
 };
 
 const COMMUNITY_SEED = [
@@ -170,8 +167,276 @@ function Skeleton({ h = 60, radius = 12, mb = 10 }) {
   );
 }
 
+function AuthScreen() {
+  const [mode, setMode] = useState("login");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const submitAuth = async (e) => {
+    e.preventDefault();
+    if (!email.trim() || !password.trim()) {
+      alert("Preenche o email e a senha.");
+      return;
+    }
+
+    setLoading(true);
+
+    const cleanedEmail = email.trim().toLowerCase();
+    let result;
+
+    if (mode === "signup") {
+      result = await supabase.auth.signUp({
+        email: cleanedEmail,
+        password,
+        options: {
+          data: { name: name.trim() || cleanedEmail.split("@")[0] },
+        },
+      });
+    } else {
+      result = await supabase.auth.signInWithPassword({
+        email: cleanedEmail,
+        password,
+      });
+    }
+
+    if (result.error) {
+      alert(result.error.message);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(false);
+  };
+
+  return (
+    <div
+      style={{
+        fontFamily: "Georgia, serif",
+        background: `radial-gradient(circle at top, rgba(201,168,76,0.14), transparent 34%), ${C.obsidian}`,
+        minHeight: "100vh",
+        color: C.white,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 22,
+      }}
+    >
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=DM+Sans:wght@400;500;700;800&display=swap');
+        * { box-sizing: border-box; }
+        body { background: #07070E; }
+        .dsp { font-family: 'Cormorant Garamond', Georgia, serif; }
+        .sans { font-family: 'DM Sans', sans-serif; }
+        input:focus { border-color: rgba(201,168,76,0.45) !important; outline: none; }
+      `}</style>
+
+      <div
+        style={{
+          width: "100%",
+          maxWidth: 430,
+          background: `linear-gradient(180deg, ${C.cardHover} 0%, ${C.deep} 100%)`,
+          border: `1px solid ${C.borderGold}`,
+          borderRadius: 28,
+          padding: 24,
+          boxShadow: "0 24px 90px rgba(0,0,0,0.45)",
+        }}
+      >
+        <div style={{ textAlign: "center", marginBottom: 24 }}>
+          <img
+            src={LOGO_URL}
+            alt="Acelera"
+            style={{
+              width: 230,
+              maxWidth: "100%",
+              height: 72,
+              objectFit: "contain",
+              filter: "drop-shadow(0 0 18px rgba(201,168,76,0.2))",
+              marginBottom: 14,
+            }}
+          />
+          <div
+            className="sans"
+            style={{
+              fontSize: 10,
+              letterSpacing: 3,
+              color: C.gold,
+              textTransform: "uppercase",
+            }}
+          >
+            Acesso Exclusivo
+          </div>
+          <div
+            className="dsp"
+            style={{
+              fontSize: 30,
+              fontWeight: 700,
+              marginTop: 8,
+              lineHeight: 1.1,
+            }}
+          >
+            Acelera <span style={{ color: C.gold }}>4.0</span>
+          </div>
+          <div
+            className="sans"
+            style={{
+              fontSize: 13,
+              color: C.muted,
+              marginTop: 8,
+              lineHeight: 1.6,
+            }}
+          >
+            Entra na tua área de preparação, comunidade e jornada pré-evento.
+          </div>
+        </div>
+
+        <form
+          onSubmit={submitAuth}
+          style={{ display: "flex", flexDirection: "column", gap: 12 }}
+        >
+          {mode === "signup" && (
+            <div>
+              <label
+                className="sans"
+                style={{
+                  fontSize: 11,
+                  color: C.muted,
+                  display: "block",
+                  marginBottom: 6,
+                }}
+              >
+                Nome
+              </label>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="O teu nome"
+                style={{
+                  width: "100%",
+                  background: "rgba(255,255,255,0.035)",
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 14,
+                  padding: "14px",
+                  color: C.white,
+                  fontFamily: "DM Sans",
+                  fontSize: 14,
+                }}
+              />
+            </div>
+          )}
+
+          <div>
+            <label
+              className="sans"
+              style={{
+                fontSize: 11,
+                color: C.muted,
+                display: "block",
+                marginBottom: 6,
+              }}
+            >
+              Email
+            </label>
+            <input
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              type="email"
+              placeholder="teuemail@exemplo.com"
+              style={{
+                width: "100%",
+                background: "rgba(255,255,255,0.035)",
+                border: `1px solid ${C.border}`,
+                borderRadius: 14,
+                padding: "14px",
+                color: C.white,
+                fontFamily: "DM Sans",
+                fontSize: 14,
+              }}
+            />
+          </div>
+
+          <div>
+            <label
+              className="sans"
+              style={{
+                fontSize: 11,
+                color: C.muted,
+                display: "block",
+                marginBottom: 6,
+              }}
+            >
+              Senha
+            </label>
+            <input
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              type="password"
+              placeholder="mínimo 6 caracteres"
+              style={{
+                width: "100%",
+                background: "rgba(255,255,255,0.035)",
+                border: `1px solid ${C.border}`,
+                borderRadius: 14,
+                padding: "14px",
+                color: C.white,
+                fontFamily: "DM Sans",
+                fontSize: 14,
+              }}
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              width: "100%",
+              marginTop: 8,
+              background: `linear-gradient(135deg, ${C.gold}, ${C.goldDim})`,
+              border: "none",
+              borderRadius: 16,
+              padding: "15px",
+              fontFamily: "DM Sans",
+              fontWeight: 800,
+              fontSize: 14,
+              color: C.obsidian,
+              cursor: loading ? "not-allowed" : "pointer",
+              opacity: loading ? 0.75 : 1,
+            }}
+          >
+            {loading
+              ? "A processar..."
+              : mode === "signup"
+              ? "Criar conta"
+              : "Entrar"}
+          </button>
+        </form>
+
+        <button
+          onClick={() => setMode(mode === "signup" ? "login" : "signup")}
+          style={{
+            width: "100%",
+            marginTop: 16,
+            background: "transparent",
+            border: `1px solid ${C.border}`,
+            borderRadius: 14,
+            padding: "12px",
+            color: C.offwhite,
+            fontFamily: "DM Sans",
+            cursor: "pointer",
+          }}
+        >
+          {mode === "signup" ? "Já tenho conta" : "Criar nova conta"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── App ─────────────────────────────────────────────────────────────────────
 export default function App() {
+  const [session, setSession] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [tab, setTab] = useState("home");
   const [liked, setLiked] = useState({});
   const [newMsg, setNewMsg] = useState("");
@@ -196,7 +461,9 @@ export default function App() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [completedModuleIds, setCompletedModuleIds] = useState(new Set());
 
-  const countdown = useCountdown(eventInfo?.event_date || mockUser.eventDate);
+  const countdown = useCountdown(
+    eventInfo?.event_date || COURSE_INFO.eventDate
+  );
   const completedModules = completedModuleIds.size;
   const progress =
     modules.length > 0
@@ -204,27 +471,25 @@ export default function App() {
       : 0;
   const progressStage = getProgressStage(progress);
 
-  const currentName = profile?.name || mockUser.name;
-  const currentEmail = profile?.email || mockUser.email;
+  const currentName =
+    profile?.name ||
+    authUser?.user_metadata?.name ||
+    authUser?.email?.split("@")[0] ||
+    "Participante";
+  const currentEmail = profile?.email || authUser?.email || "";
   const currentRole = profile?.role || "user";
-  const currentAvatar =
-    profile?.avatar ||
-    mockUser.avatar ||
-    currentName
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .slice(0, 2)
-      .toUpperCase();
+  const currentAvatar = profile?.avatar || initials(currentName);
   const currentAvatarIsImage =
     typeof currentAvatar === "string" && currentAvatar.startsWith("http");
 
   const ensureParticipantProfile = async () => {
     if (profile?.id) return profile;
+    if (!authUser?.id) return null;
 
     const { data, error } = await supabase
       .from("participants")
       .insert({
+        id: authUser.id,
         name: currentName,
         email: currentEmail,
         avatar: currentAvatarIsImage ? currentAvatar : null,
@@ -431,28 +696,58 @@ export default function App() {
 
   // Fetch profile
   useEffect(() => {
+    if (!authUser?.id) {
+      setProfile(null);
+      return;
+    }
+
     (async () => {
       const { data, error } = await supabase
         .from("participants")
         .select("*")
-        .eq("email", mockUser.email)
+        .eq("id", authUser.id)
         .maybeSingle();
 
       if (!error && data) {
         setProfile(data);
+        return;
+      }
+
+      const fallbackName =
+        authUser.user_metadata?.name ||
+        authUser.email?.split("@")[0] ||
+        "Participante";
+
+      const { data: created, error: createError } = await supabase
+        .from("participants")
+        .insert({
+          id: authUser.id,
+          name: fallbackName,
+          email: authUser.email,
+          avatar: null,
+          progress: 0,
+          role: "user",
+        })
+        .select()
+        .single();
+
+      if (!createError && created) {
+        setProfile(created);
       } else {
         setProfile({
-          name: mockUser.name,
-          email: mockUser.email,
-          avatar: mockUser.avatar,
+          id: authUser.id,
+          name: fallbackName,
+          email: authUser.email,
+          avatar: null,
           progress: 0,
           role: "user",
         });
       }
 
       if (error) console.log("Erro participants:", error);
+      if (createError) console.log("Erro ao criar participant:", createError);
     })();
-  }, []);
+  }, [authUser?.id]);
 
   // Fetch module progress for current participant
   useEffect(() => {
@@ -601,6 +896,14 @@ export default function App() {
     setUploadingPhoto(false);
   };
 
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    setProfile(null);
+    setCompletedModuleIds(new Set());
+    setPosts([]);
+    setProfileOpen(false);
+  };
+
   const saveProfile = async () => {
     if (!profile?.name?.trim()) {
       alert("O nome não pode ficar vazio.");
@@ -627,6 +930,7 @@ export default function App() {
       result = await supabase
         .from("participants")
         .insert({
+          id: authUser?.id,
           ...payload,
           email: currentEmail,
           progress: profile.progress || 0,
@@ -646,6 +950,26 @@ export default function App() {
     setSavingProfile(false);
     setProfileOpen(false);
   };
+
+  if (authLoading) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background: C.obsidian,
+          color: C.gold,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontFamily: "DM Sans",
+        }}
+      >
+        A carregar Acelera...
+      </div>
+    );
+  }
+
+  if (!session) return <AuthScreen />;
 
   return (
     <div
@@ -770,8 +1094,8 @@ export default function App() {
                 lineHeight: 1.3,
               }}
             >
-              {mockUser.course}{" "}
-              <span style={{ color: C.gold }}>{mockUser.edition}</span>
+              {COURSE_INFO.course}{" "}
+              <span style={{ color: C.gold }}>{COURSE_INFO.edition}</span>
             </div>
           </div>
 
@@ -932,7 +1256,7 @@ export default function App() {
                         fontStyle: "italic",
                       }}
                     >
-                      {eventInfo?.event_month || mockUser.eventMonthLabel}
+                      {eventInfo?.event_month || COURSE_INFO.eventMonthLabel}
                     </div>
                   </div>
                   <div
@@ -2723,6 +3047,25 @@ export default function App() {
               }}
             >
               {savingProfile ? "A guardar..." : "Guardar alterações"}
+            </button>
+
+            <button
+              onClick={signOut}
+              style={{
+                width: "100%",
+                marginTop: 10,
+                background: "transparent",
+                border: `1px solid ${C.border}`,
+                borderRadius: 14,
+                padding: "12px",
+                fontFamily: "DM Sans",
+                fontWeight: 700,
+                fontSize: 13,
+                color: C.muted,
+                cursor: "pointer",
+              }}
+            >
+              Terminar sessão
             </button>
 
             {currentRole === "admin" && (
