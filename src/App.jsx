@@ -135,8 +135,20 @@ function useCountdown(targetDate) {
 const GLOBAL_CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600;1,700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&display=swap');
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  html { -webkit-tap-highlight-color: transparent; }
-  body { background: #05050F; overscroll-behavior: none; }
+  html {
+    -webkit-tap-highlight-color: transparent;
+    width: 100%;
+    min-height: 100%;
+  }
+
+  body, #root {
+    width: 100%;
+    min-height: 100dvh;
+    margin: 0;
+    background: #05050F;
+    overscroll-behavior: none;
+    overflow-x: hidden;
+  }
   .dsp { font-family: 'Cormorant Garamond', Georgia, serif; }
   .sans { font-family: 'DM Sans', system-ui, sans-serif; }
   ::-webkit-scrollbar { width: 0; height: 0; }
@@ -1202,11 +1214,13 @@ export default function App() {
       style={{
         fontFamily: "Georgia, serif",
         background: C.obsidian,
-        minHeight: "100vh",
+        minHeight: "100dvh",
+        width: "100%",
+        maxWidth: "100%",
+        margin: 0,
         color: C.white,
-        maxWidth: 430,
-        margin: "0 auto",
         position: "relative",
+        overflowX: "hidden",
       }}
     >
       <style>{GLOBAL_CSS}</style>
@@ -3240,10 +3254,10 @@ export default function App() {
         style={{
           position: "fixed",
           bottom: 0,
-          left: "50%",
-          transform: "translateX(-50%)",
+          left: 0,
+          right: 0,
           width: "100%",
-          maxWidth: 430,
+          maxWidth: "100%",
           height: 60,
           pointerEvents: "none",
           zIndex: 10,
